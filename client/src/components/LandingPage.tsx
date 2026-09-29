@@ -10,16 +10,24 @@ import {
   ArrowRight, 
   FileVideo, 
   Users, 
-  Lock
+  Lock,
+  Download
 } from 'lucide-react';
 import { LanguageSelector } from './LanguageSelector.js';
 
 interface LandingPageProps {
   onCreateRoom: () => void;
   onJoinRoom: () => void;
+  onInstallApp?: () => void;
+  isInstalled?: boolean;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onCreateRoom, onJoinRoom }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ 
+  onCreateRoom, 
+  onJoinRoom,
+  onInstallApp,
+  isInstalled = false
+}) => {
   const { t } = useTranslation();
 
   return (
@@ -60,7 +68,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateRoom, onJoinRo
             </button>
           </div>
 
-          <div className="mt-8 flex items-center justify-center gap-2 text-xs text-zinc-500">
+          {/* Quick PWA Install Callout Banner */}
+          {!isInstalled && onInstallApp && (
+            <div className="mt-8 max-w-md mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <button
+                type="button"
+                onClick={onInstallApp}
+                className="w-full p-3 sm:p-3.5 rounded-2xl bg-zinc-950/80 hover:bg-emerald-950/40 border border-emerald-500/30 hover:border-emerald-500/60 shadow-xl shadow-emerald-950/40 flex items-center justify-between group transition-all cursor-pointer active:scale-98"
+              >
+                <div className="flex items-center gap-3 text-left">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-2">
+                      <span>Install CineMate as an App</span>
+                      <span className="text-[9px] font-mono uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded font-semibold">
+                        PWA
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                      1-tap launch from home screen • No URL bar needed
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
+              </button>
+            </div>
+          )}
+
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-500">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             <span>{t('brand.privacyBadge')}</span>
           </div>

@@ -1,0 +1,55 @@
+{
+  "name": "CineMate — Watch Together",
+  "short_name": "CineMate",
+  "description": "Watch movies together with synchronized playback and voice chat. Your video stays on your device.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#06120e",
+  "theme_color": "#06120e",
+  "categories": ["entertainment", "video", "social"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Join Room",
+      "short_name": "Join",
+      "description": "Join an existing watch party room",
+      "url": "/#join",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Create Room",
+      "short_name": "Create",
+      "description": "Start a new watch party",
+      "url": "/#create",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

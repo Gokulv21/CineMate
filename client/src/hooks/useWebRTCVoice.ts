@@ -11,6 +11,9 @@ interface WebRTCVoiceProps {
 const DEFAULT_STUN_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
 ];
 
 export function useWebRTCVoice({
@@ -20,13 +23,16 @@ export function useWebRTCVoice({
 }: WebRTCVoiceProps) {
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('DISCONNECTED');
   const [isMuted, setIsMuted] = useState<boolean>(true);
+  const isMutedRef = useRef<boolean>(true);
+  isMutedRef.current = isMuted;
+
   const [isSpeakingLocally, setIsSpeakingLocally] = useState<boolean>(false);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const remoteAudioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
-  const localAnalyserRef = useRef<AnalyserNode | null>(null);
   const speechIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const getIceServers = useCallback((): RTCIceServer[] => {
@@ -34,6 +40,42 @@ export function useWebRTCVoice({
       return [{ urls: import.meta.env.VITE_STUN_URL.split(',') }];
     }
     return DEFAULT_STUN_SERVERS;
+  }, []);
+
+  // Drain and apply queued early ICE candidates once remote description is set
+  const drainIceCandidates = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
+    const queue = pendingCandidatesRef.current.get(peerId);
+    if (!queue || queue.length === 0) return;
+
+    for (const cand of queue) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(cand));
+      } catch (err) {
+        console.warn(`[WEBRTC] Failed to apply drained ICE candidate for ${peerId}:`, err);
+      }
+    }
+    pendingCandidatesRef.current.delete(peerId);
+  }, []);
+
+  // Synchronize local audio track into all existing peer connections
+  const attachTrackToPeerConnections = useCallback((track: MediaStreamTrack) => {
+    peerConnectionsRef.current.forEach((pc) => {
+      const senders = pc.getSenders();
+      const audioSender = senders.find(s => !s.track || s.track.kind === 'audio');
+      if (audioSender) {
+        audioSender.replaceTrack(track).catch((err) => {
+          console.warn('[WEBRTC] replaceTrack failed:', err);
+        });
+      } else {
+        try {
+          if (localStreamRef.current) {
+            pc.addTrack(track, localStreamRef.current);
+          }
+        } catch (err) {
+          console.warn('[WEBRTC] addTrack failed:', err);
+        }
+      }
+    });
   }, []);
 
   const startAudio = useCallback(async () => {
@@ -55,11 +97,18 @@ export function useWebRTCVoice({
 
       localStreamRef.current = stream;
 
+      // Sync initial muted state on the hardware tracks
       stream.getAudioTracks().forEach((track) => {
-        track.enabled = false;
+        track.enabled = !isMutedRef.current;
       });
-      setIsMuted(true);
 
+      // Crucial: Seamlessly push mic track to all peer connections already created
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        attachTrackToPeerConnections(audioTrack);
+      }
+
+      // Voice activity detector
       try {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioCtx) {
@@ -69,12 +118,11 @@ export function useWebRTCVoice({
           const analyser = audioCtx.createAnalyser();
           analyser.fftSize = 256;
           source.connect(analyser);
-          localAnalyserRef.current = analyser;
 
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           if (speechIntervalRef.current) clearInterval(speechIntervalRef.current);
           speechIntervalRef.current = setInterval(() => {
-            if (!localStreamRef.current || isMuted) {
+            if (!localStreamRef.current || isMutedRef.current) {
               setIsSpeakingLocally(false);
               return;
             }
@@ -96,7 +144,7 @@ export function useWebRTCVoice({
       console.warn('[WEBRTC] Could not access microphone:', err.message);
       setVoiceStatus('ERROR');
     }
-  }, [isMuted]);
+  }, [attachTrackToPeerConnections]);
 
   const getOrCreatePeerConnection = useCallback((targetId: string): RTCPeerConnection => {
     let pc = peerConnectionsRef.current.get(targetId);
@@ -110,10 +158,16 @@ export function useWebRTCVoice({
 
     peerConnectionsRef.current.set(targetId, pc);
 
+    // Pre-allocate audio transceiver with sendrecv. This guarantees the SDP contains an audio m-line
+    // even if mic permissions are still pending on mobile!
+    const transceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
+
+    // If local mic track is already active, attach it right now
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        pc!.addTrack(track, localStreamRef.current!);
-      });
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        transceiver.sender.replaceTrack(audioTrack).catch(() => {});
+      }
     }
 
     pc.onicecandidate = (event) => {
@@ -129,12 +183,34 @@ export function useWebRTCVoice({
     pc.ontrack = (event) => {
       let audioEl = remoteAudioElementsRef.current.get(targetId);
       if (!audioEl) {
-        audioEl = new Audio();
+        audioEl = document.createElement('audio');
+        audioEl.id = `remote-audio-${targetId}`;
         audioEl.autoplay = true;
+        (audioEl as any).playsInline = true;
+        audioEl.style.display = 'none';
+        document.body.appendChild(audioEl);
         remoteAudioElementsRef.current.set(targetId, audioEl);
       }
-      audioEl.srcObject = event.streams[0];
-      audioEl.play().catch((e) => console.warn('[WEBRTC] Audio play error:', e));
+
+      if (event.streams && event.streams[0]) {
+        audioEl.srcObject = event.streams[0];
+      } else if (event.track) {
+        audioEl.srcObject = new MediaStream([event.track]);
+      }
+
+      const playPromise = audioEl.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((e) => {
+          console.warn('[WEBRTC] Audio autoplay blocked, waiting for user gesture:', e);
+          const resumeAudio = () => {
+            audioEl?.play().catch(() => {});
+            window.removeEventListener('click', resumeAudio);
+            window.removeEventListener('touchstart', resumeAudio);
+          };
+          window.addEventListener('click', resumeAudio, { once: true });
+          window.addEventListener('touchstart', resumeAudio, { once: true });
+        });
+      }
     };
 
     pc.onconnectionstatechange = () => {
@@ -181,6 +257,8 @@ export function useWebRTCVoice({
         try {
           const pc = getOrCreatePeerConnection(from);
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          await drainIceCandidates(from, pc);
+
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
@@ -201,6 +279,7 @@ export function useWebRTCVoice({
           const pc = peerConnectionsRef.current.get(from);
           if (pc && pc.signalingState !== 'stable') {
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            await drainIceCandidates(from, pc);
           }
         } catch (err) {
           console.error(`[WEBRTC] Failed to handle answer from ${from}:`, err);
@@ -209,8 +288,13 @@ export function useWebRTCVoice({
         const { from, candidate } = msg;
         try {
           const pc = peerConnectionsRef.current.get(from);
-          if (pc && candidate) {
+          if (pc && pc.remoteDescription && pc.remoteDescription.type) {
             await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } else {
+            // Buffer early candidate until remote description is established
+            const queue = pendingCandidatesRef.current.get(from) || [];
+            queue.push(candidate);
+            pendingCandidatesRef.current.set(from, queue);
           }
         } catch (err) {
           console.error(`[WEBRTC] Failed to add ICE candidate from ${from}:`, err);
@@ -225,10 +309,15 @@ export function useWebRTCVoice({
           pc.close();
           peerConnectionsRef.current.delete(msg.participantId);
         }
+        pendingCandidatesRef.current.delete(msg.participantId);
+
         const audio = remoteAudioElementsRef.current.get(msg.participantId);
         if (audio) {
           audio.pause();
           audio.srcObject = null;
+          if (audio.parentNode) {
+            audio.parentNode.removeChild(audio);
+          }
           remoteAudioElementsRef.current.delete(msg.participantId);
         }
       }
@@ -237,7 +326,7 @@ export function useWebRTCVoice({
     return () => {
       unsubscribe();
     };
-  }, [enabled, myParticipantId, getOrCreatePeerConnection, callPeer]);
+  }, [enabled, myParticipantId, getOrCreatePeerConnection, callPeer, drainIceCandidates]);
 
   useEffect(() => {
     if (!enabled || !myParticipantId) return;
@@ -261,8 +350,11 @@ export function useWebRTCVoice({
     if (!localStreamRef.current) {
       startAudio().then(() => {
         setIsMuted(false);
+        isMutedRef.current = false;
         if (localStreamRef.current) {
           localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = true));
+          const track = localStreamRef.current.getAudioTracks()[0];
+          if (track) attachTrackToPeerConnections(track);
         }
         wsService.sendMessage({ type: 'MUTE_STATUS', isMuted: false });
       });
@@ -274,12 +366,18 @@ export function useWebRTCVoice({
       track.enabled = !nextMuted;
     });
     setIsMuted(nextMuted);
+    isMutedRef.current = nextMuted;
+
+    if (!nextMuted) {
+      const track = localStreamRef.current.getAudioTracks()[0];
+      if (track) attachTrackToPeerConnections(track);
+    }
 
     wsService.sendMessage({
       type: 'MUTE_STATUS',
       isMuted: nextMuted
     });
-  }, [isMuted, startAudio]);
+  }, [isMuted, startAudio, attachTrackToPeerConnections]);
 
   useEffect(() => {
     return () => {
@@ -292,9 +390,13 @@ export function useWebRTCVoice({
       }
       peerConnectionsRef.current.forEach((pc) => pc.close());
       peerConnectionsRef.current.clear();
+      pendingCandidatesRef.current.clear();
       remoteAudioElementsRef.current.forEach((audio) => {
         audio.pause();
         audio.srcObject = null;
+        if (audio.parentNode) {
+          audio.parentNode.removeChild(audio);
+        }
       });
       remoteAudioElementsRef.current.clear();
     };

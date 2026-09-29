@@ -1375,13 +1375,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onPointerUp={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             data-interactive="true"
-            className={`absolute bottom-0 inset-x-0 px-3 sm:px-4 pb-3 sm:pb-4 pt-8 bg-gradient-to-t from-black/95 via-black/60 to-transparent transition-all duration-300 z-30 ${
+            className={`absolute bottom-0 inset-x-0 px-2 sm:px-4 pb-2 sm:pb-4 pt-6 sm:pt-8 bg-gradient-to-t from-black/95 via-black/70 to-transparent transition-all duration-300 z-30 ${
               showControls ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'
             }`}
           >
             {/* Scrubber Progress Bar */}
             <div
-              className="relative w-full h-3 group/scrub flex items-center cursor-pointer mb-2.5"
+              className="relative w-full h-3 group/scrub flex items-center cursor-pointer mb-2"
               onMouseMove={handleMouseMoveScrubber}
               onMouseLeave={handleMouseLeaveScrubber}
               onClick={(e) => e.stopPropagation()}
@@ -1417,25 +1417,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </div>
 
             {/* Bottom Row controls */}
-            <div className="flex items-center justify-between text-zinc-300">
+            <div className="flex items-center justify-between text-zinc-300 gap-1 sm:gap-2 w-full min-w-0">
               {/* Left: Time and Lock badge */}
-              <div className="flex items-center gap-3">
-                <div className="text-xs font-mono text-zinc-300 tracking-wider">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
+                <div className="text-[11px] sm:text-xs font-mono text-zinc-300 tracking-tight whitespace-nowrap">
                   <span className="text-white font-medium">{formatTime(currentTime)}</span>
-                  <span className="text-zinc-600 mx-1.5">/</span>
+                  <span className="text-zinc-600 mx-1">/</span>
                   <span className="text-zinc-400">{formatTime(duration)}</span>
                 </div>
 
                 {!canControl && (
-                  <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-zinc-400 bg-zinc-900/80 px-2 py-0.5 rounded-lg border border-zinc-800">
+                  <div className="hidden md:flex items-center gap-1 text-[10px] text-zinc-400 bg-zinc-900/80 px-1.5 py-0.5 rounded border border-zinc-800">
                     <Lock className="w-3 h-3 text-emerald-400" />
-                    <span>{t('video.hostOnlyControl')}</span>
+                    <span className="hidden lg:inline">{t('video.hostOnlyControl')}</span>
                   </div>
                 )}
               </div>
 
-              {/* Right: Quick Reaction 💚, Volume, Speed, PiP, Fullscreen */}
-              <div className="flex items-center gap-2 sm:gap-3" data-interactive="true" onClick={(e) => e.stopPropagation()}>
+              {/* Right: Quick Reaction 💚, Volume, Speed, CC, Audio, Rotate, Fullscreen */}
+              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto" data-interactive="true" onClick={(e) => e.stopPropagation()}>
                 {/* Send 💚 Reaction inside controls HUD */}
                 {reactionsEnabled && onSendReaction && (
                   <button
@@ -1445,26 +1445,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                       onSendReaction('💚');
                       resetControlsTimeout();
                     }}
-                    className="p-1.5 rounded-lg bg-emerald-950/50 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 active:scale-125 cursor-pointer"
+                    className="p-1 sm:p-1.5 rounded-lg bg-emerald-950/50 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 active:scale-125 cursor-pointer shrink-0"
                     title="Send 💚 Reaction"
                   >
-                    <Heart className="w-4 h-4 fill-emerald-400 text-emerald-400" />
-                    <span className="text-[11px] font-semibold hidden xs:inline">React</span>
+                    <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-emerald-400 text-emerald-400" />
+                    <span className="text-[10px] sm:text-[11px] font-semibold hidden md:inline">React</span>
                   </button>
                 )}
 
                 {/* Volume */}
-                <div className="flex items-center gap-1 sm:gap-1.5 group/vol">
+                <div className="flex items-center gap-1 group/vol shrink-0">
                   <button
                     type="button"
                     onClick={toggleMute}
-                    className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                    className="p-1 sm:p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0"
                     aria-label="Toggle mute"
                   >
                     {isMuted || volume === 0 ? (
-                      <VolumeX className="w-4 h-4 text-emerald-400" />
+                      <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
                     ) : (
-                      <Volume2 className="w-4 h-4" />
+                      <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     )}
                   </button>
                   <input
@@ -1474,30 +1474,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     step={0.05}
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    className="w-12 sm:w-16 h-1 bg-zinc-700 rounded-lg cursor-pointer hidden xs:inline-block"
+                    className="w-12 sm:w-16 h-1 bg-zinc-700 rounded-lg cursor-pointer hidden md:inline-block"
                     aria-label="Volume slider"
                   />
                 </div>
 
                 {/* Speed selector */}
-                <div className="relative">
+                <div className="relative shrink-0">
                   <select
                     value={playbackRate}
                     onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-                    className="bg-zinc-900/90 hover:bg-zinc-800 text-[11px] font-mono font-medium text-zinc-300 px-2 py-1 rounded-lg border border-zinc-700/60 focus:outline-none cursor-pointer"
+                    className="bg-zinc-900/90 hover:bg-zinc-800 text-[10px] sm:text-[11px] font-mono font-medium text-zinc-300 px-1 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg border border-zinc-700/60 focus:outline-none cursor-pointer"
                     aria-label="Playback speed"
                   >
                     <option value={0.5}>0.5x</option>
                     <option value={0.75}>0.75x</option>
-                    <option value={1.0}>1.0x</option>
+                    <option value={1.0}>1x</option>
                     <option value={1.25}>1.25x</option>
                     <option value={1.5}>1.5x</option>
-                    <option value={2.0}>2.0x</option>
+                    <option value={2.0}>2x</option>
                   </select>
                 </div>
 
                 {/* Subtitles / Captions (CC) */}
-                <div className="relative">
+                <div className="relative shrink-0">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1506,7 +1506,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                       setShowAudioMenu(false);
                       setShowFitMenu(false);
                     }}
-                    className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
+                    className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 shrink-0 ${
                       selectedSubtitle
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                         : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
@@ -1514,9 +1514,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     aria-label="Subtitles & Captions"
                     title="Subtitles & Captions (CC)"
                   >
-                    <Captions className="w-4 h-4" />
+                    <Captions className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     {selectedSubtitle && (
-                      <span className="text-[9px] font-bold text-emerald-300">CC</span>
+                      <span className="text-[8px] sm:text-[9px] font-bold text-emerald-300">CC</span>
                     )}
                   </button>
 
@@ -1524,7 +1524,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   {showSubtitleMenu && (
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="absolute right-0 bottom-full mb-2 w-56 rounded-xl bg-zinc-950/95 border border-emerald-900/60 shadow-2xl backdrop-blur-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+                      className="absolute right-0 bottom-full mb-2 w-52 sm:w-56 rounded-xl bg-zinc-950/95 border border-emerald-900/60 shadow-2xl backdrop-blur-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
                     >
                       <div className="px-3 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-zinc-800/80 flex items-center justify-between">
                         <span>Subtitles / Captions</span>
@@ -1590,7 +1590,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 </div>
 
                 {/* Audio Language / Track Selector */}
-                <div className="relative">
+                <div className="relative shrink-0">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1599,7 +1599,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                       setShowSubtitleMenu(false);
                       setShowFitMenu(false);
                     }}
-                    className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
+                    className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 shrink-0 ${
                       selectedAudioTrack !== 'default'
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                         : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
@@ -1607,9 +1607,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     aria-label="Audio Tracks & Languages"
                     title="Audio Tracks & Languages"
                   >
-                    <Languages className="w-4 h-4" />
+                    <Languages className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     {selectedAudioTrack !== 'default' && (
-                      <span className="text-[9px] font-bold text-emerald-300">AUDIO</span>
+                      <span className="text-[8px] sm:text-[9px] font-bold text-emerald-300">AU</span>
                     )}
                   </button>
 
@@ -1617,7 +1617,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   {showAudioMenu && (
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="absolute right-0 bottom-full mb-2 w-64 rounded-xl bg-zinc-950/95 border border-emerald-900/60 shadow-2xl backdrop-blur-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+                      className="absolute right-0 bottom-full mb-2 w-56 sm:w-64 rounded-xl bg-zinc-950/95 border border-emerald-900/60 shadow-2xl backdrop-blur-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
                     >
                       <div className="px-3 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-zinc-800/80 flex items-center justify-between">
                         <span>Audio Track / Language</span>
@@ -1713,11 +1713,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <button
                   type="button"
                   onClick={togglePiP}
-                  className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors hidden sm:inline-flex cursor-pointer"
+                  className="p-1 sm:p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors hidden md:inline-flex cursor-pointer shrink-0"
                   aria-label="Picture in picture"
                   title="Picture in Picture"
                 >
-                  <PictureInPicture className="w-4 h-4" />
+                  <PictureInPicture className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
 
                 {/* Rotate Landscape */}
@@ -1727,29 +1727,29 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     e.stopPropagation();
                     toggleRotateLandscape();
                   }}
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
+                  className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center shrink-0 border ${
                     isRotatedLandscape
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                      ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-950'
+                      : 'bg-zinc-900/80 hover:bg-emerald-950/60 text-zinc-300 hover:text-white border-emerald-900/50 hover:border-emerald-600/60'
                   }`}
                   aria-label="Rotate Orientation"
                   title={isRotatedLandscape ? 'Switch to Portrait' : 'Rotate to Landscape'}
                 >
-                  <RotateCw className={`w-4 h-4 ${isRotatedLandscape ? 'text-white' : 'text-emerald-400'}`} />
+                  <RotateCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isRotatedLandscape ? 'text-white' : 'text-emerald-400'}`} />
                 </button>
 
-                {/* Fullscreen */}
+                {/* Fullscreen / Expand */}
                 <button
                   type="button"
                   onClick={toggleFullscreen}
-                  className="p-1.5 text-zinc-300 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                  className="p-1 sm:p-1.5 text-zinc-200 hover:text-white rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/60 hover:border-emerald-600/50 transition-colors cursor-pointer shrink-0"
                   aria-label="Toggle fullscreen"
                   title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen & Landscape'}
                 >
                   {isFullscreen ? (
-                    <Minimize className="w-4 h-4 text-emerald-400" />
+                    <Minimize className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
                   ) : (
-                    <Maximize className="w-4 h-4" />
+                    <Maximize className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   )}
                 </button>
               </div>

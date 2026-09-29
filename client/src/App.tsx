@@ -5,6 +5,8 @@ import { LandingPage } from './components/LandingPage.js';
 import { CreateRoomModal } from './components/CreateRoomModal.js';
 import { JoinRoomModal } from './components/JoinRoomModal.js';
 import { WatchRoom } from './components/WatchRoom.js';
+import { InstallModal } from './components/InstallModal.js';
+import { usePWAInstall } from './hooks/usePWAInstall.js';
 
 import { API_BASE_URL } from './config/api.js';
 
@@ -17,7 +19,17 @@ export const App: React.FC = () => {
   const [activeRoom, setActiveRoom] = useState<ActiveRoomSession | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [inviteRoomCode, setInviteRoomCode] = useState<string>('');
+
+  const {
+    canPromptDirectly,
+    isInstalled,
+    isIOS,
+    showIOSModal,
+    setShowIOSModal,
+    installApp
+  } = usePWAInstall();
 
   // Pre-warm backend Render server on app load to minimize cold-start latency
   useEffect(() => {
@@ -58,6 +70,17 @@ export const App: React.FC = () => {
     window.history.pushState({}, '', window.location.pathname);
   };
 
+  const handleTriggerInstall = async () => {
+    if (canPromptDirectly) {
+      const accepted = await installApp();
+      if (!accepted) {
+        setIsInstallOpen(true);
+      }
+    } else {
+      setIsInstallOpen(true);
+    }
+  };
+
   if (activeRoom) {
     return (
       <WatchRoom
@@ -73,12 +96,16 @@ export const App: React.FC = () => {
       <Navbar
         onCreateRoom={() => setIsCreateOpen(true)}
         onJoinRoom={() => setIsJoinOpen(true)}
+        onInstallApp={handleTriggerInstall}
+        isInstalled={isInstalled}
       />
 
       <main className="flex-1">
         <LandingPage
           onCreateRoom={() => setIsCreateOpen(true)}
           onJoinRoom={() => setIsJoinOpen(true)}
+          onInstallApp={handleTriggerInstall}
+          isInstalled={isInstalled}
         />
       </main>
 
@@ -95,8 +122,21 @@ export const App: React.FC = () => {
         onClose={() => setIsJoinOpen(false)}
         onJoinRoom={handleRoomJoined}
       />
+
+      <InstallModal
+        isOpen={isInstallOpen || showIOSModal}
+        onClose={() => {
+          setIsInstallOpen(false);
+          setShowIOSModal(false);
+        }}
+        onInstall={installApp}
+        canPromptDirectly={canPromptDirectly}
+        isIOS={isIOS}
+        isInstalled={isInstalled}
+      />
     </div>
   );
 };
 
 export default App;
+

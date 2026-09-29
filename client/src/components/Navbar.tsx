@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Heart, Menu, X, PlusCircle, LogIn } from 'lucide-react';
+import { Heart, Menu, X, PlusCircle, LogIn, Download } from 'lucide-react';
 import { LanguageSelector } from './LanguageSelector.js';
 
 interface NavbarProps {
   onCreateRoom: () => void;
   onJoinRoom: () => void;
+  onInstallApp?: () => void;
+  isInstalled?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
+export const Navbar: React.FC<NavbarProps> = ({ 
+  onCreateRoom, 
+  onJoinRoom, 
+  onInstallApp,
+  isInstalled = false
+}) => {
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -60,6 +67,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
           <LanguageSelector />
+
+          {!isInstalled && onInstallApp && (
+            <button
+              onClick={onInstallApp}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-950/50 hover:bg-emerald-900/50 border border-emerald-800/50 hover:border-emerald-500/50 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="Install CineMate as standalone App"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Install App</span>
+            </button>
+          )}
+
           <button
             onClick={onJoinRoom}
             className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-zinc-900/90 hover:bg-zinc-800 border border-emerald-900/30 hover:border-emerald-700/50 transition-all flex items-center gap-1.5"
@@ -76,8 +95,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
           </button>
         </div>
 
-        {/* Mobile Hamburger Button */}
+        {/* Mobile Actions */}
         <div className="flex md:hidden items-center gap-2">
+          {!isInstalled && onInstallApp && (
+            <button
+              onClick={onInstallApp}
+              className="p-1.5 rounded-lg text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 flex items-center gap-1 text-xs font-medium"
+              title="Install CineMate App"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-semibold">App</span>
+            </button>
+          )}
+
           <LanguageSelector compact />
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -113,6 +143,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
             </button>
           </div>
           <div className="pt-2 border-t border-zinc-800/80 flex flex-col gap-2">
+            {!isInstalled && onInstallApp && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onInstallApp();
+                }}
+                className="w-full py-2.5 rounded-lg text-sm font-semibold text-emerald-300 bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-800/60 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                <Download className="w-4 h-4 text-emerald-400" />
+                <span>Install CineMate App (PWA)</span>
+              </button>
+            )}
+
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
@@ -139,3 +182,4 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
     </header>
   );
 };
+
