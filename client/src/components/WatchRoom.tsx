@@ -7,9 +7,7 @@ import {
   Share2, 
   LogOut, 
   Radio, 
-  MessageSquare,
-  Copy,
-  Check
+  MessageSquare
 } from 'lucide-react';
 import type { 
   Room, 
@@ -57,17 +55,6 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<'chat' | 'voice'>('chat');
   const [partnerMetadata, setPartnerMetadata] = useState<VideoMetadata | undefined>(undefined);
-  const [copiedId, setCopiedId] = useState(false);
-
-  const handleCopyRoomId = async () => {
-    try {
-      await navigator.clipboard.writeText(roomId);
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy room id:', err);
-    }
-  };
 
   useEffect(() => {
     wsService.connect(roomId, userName);
@@ -277,22 +264,9 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           <span className="text-zinc-600 hidden md:inline">•</span>
 
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <h2 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate max-w-[90px] xs:max-w-[130px] sm:max-w-xs">
+            <h2 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs">
               {room?.name || 'Movie Night 💚'}
             </h2>
-            <button
-              type="button"
-              onClick={handleCopyRoomId}
-              className="inline-flex items-center justify-center gap-1 h-7 px-2 rounded-md bg-zinc-900/90 border border-emerald-900/40 hover:border-emerald-500/50 text-[11px] font-mono font-bold text-emerald-400 hover:text-emerald-300 transition-colors shrink-0 cursor-pointer active:scale-95"
-              title="Click to copy Room Code"
-            >
-              <span>{roomId}</span>
-              {copiedId ? (
-                <Check className="w-3 h-3 text-emerald-400" />
-              ) : (
-                <Copy className="w-3 h-3 text-zinc-500" />
-              )}
-            </button>
           </div>
         </div>
 

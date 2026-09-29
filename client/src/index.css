@@ -102,3 +102,15 @@ input[type="range"] {
 .animate-pulse-subtle {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Cinema Subtitle Styling */
+video::cue {
+  background-color: rgba(0, 0, 0, 0.85);
+  color: #f3f4f6;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  border-radius: 6px;
+  padding: 3px 8px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
