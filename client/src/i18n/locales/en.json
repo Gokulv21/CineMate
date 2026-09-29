@@ -1,0 +1,145 @@
+{
+  "brand": {
+    "name": "CineMate",
+    "tagline": "Watch together. Wherever you are.",
+    "privacyBadge": "Your movie stays on your device. We never upload your files."
+  },
+  "nav": {
+    "howItWorks": "How it works",
+    "features": "Features",
+    "privacy": "Privacy",
+    "createRoom": "Create Room",
+    "joinRoom": "Join Room"
+  },
+  "hero": {
+    "title": "Distance shouldn't stop movie night.",
+    "subtitle": "Watch your favorite movies together, talk, chat and react — wherever you are.",
+    "createButton": "Create a Room",
+    "joinButton": "Join a Room",
+    "badge": "Real-time sync • Voice chat • 100% Private"
+  },
+  "howItWorks": {
+    "title": "How it works",
+    "subtitle": "Three simple steps to stream movies in perfect harmony",
+    "step1Title": "Create a room",
+    "step1Desc": "Create a private cinema room and share the invite code or link with your partner.",
+    "step2Title": "Choose your movie",
+    "step2Desc": "Each person selects their own local video file. No files are uploaded to our servers.",
+    "step3Title": "Watch together",
+    "step3Desc": "Playback, voice, reactions, and chat stay seamlessly synchronized in real-time.",
+    "privacyNote": "Your video stays on your device. We don't upload or store your video files."
+  },
+  "features": {
+    "title": "Built for intimate cinema moments",
+    "syncTitle": "Sub-Second Sync",
+    "syncDesc": "Precision clock correction gently aligns playback speeds without sudden skipping.",
+    "voiceTitle": "Crystal Voice Chat",
+    "voiceDesc": "Talk naturally over WebRTC voice mesh with speaking visualizers and instant mute.",
+    "privacyTitle": "True Local Privacy",
+    "privacyDesc": "Direct browser File APIs play movies locally. Zero server bandwidth or copyright issues.",
+    "reactionsTitle": "Live Floating Reactions",
+    "reactionsDesc": "Express your emotions in real-time with floating reaction bursts across the screen."
+  },
+  "createModal": {
+    "title": "Create a Room ❤️",
+    "subtitle": "Host a private movie night for you and your partner",
+    "nameLabel": "Your Name",
+    "namePlaceholder": "e.g. Gokul",
+    "roomNameLabel": "Room Name (Optional)",
+    "roomNamePlaceholder": "e.g. Interstellar Night ❤️",
+    "submitButton": "Create Room",
+    "readyTitle": "Your room is ready ❤️",
+    "readySubtitle": "Share the room code or invite link with your partner",
+    "roomCodeLabel": "Room Code",
+    "copyLink": "Copy Invite Link",
+    "copyCode": "Copy Code",
+    "enterRoom": "Enter Room",
+    "copied": "Copied!"
+  },
+  "joinModal": {
+    "title": "Join a Room",
+    "subtitle": "Enter the 6-character room code to join your partner",
+    "roomCodeLabel": "Room Code",
+    "roomCodePlaceholder": "e.g. AB7XK9",
+    "nameLabel": "Your Name",
+    "namePlaceholder": "e.g. Partner",
+    "submitButton": "Join Room",
+    "notFound": "This room doesn't exist or has expired."
+  },
+  "room": {
+    "online": "watching",
+    "invite": "Invite",
+    "settings": "Settings",
+    "leave": "Leave",
+    "hostBadge": "HOST",
+    "connecting": "Connecting...",
+    "connected": "Connected",
+    "reconnecting": "Reconnecting...",
+    "disconnected": "Disconnected",
+    "leaveConfirm": "Are you sure you want to leave this room?",
+    "waitingForPartner": "Waiting for someone to join... Share your room link to invite them.",
+    "copyInviteLink": "Copy Room Link"
+  },
+  "video": {
+    "chooseMovie": "Choose your movie",
+    "localNotice": "Your video stays on your device. It is never uploaded to CineMate.",
+    "chooseFileButton": "Choose Video File",
+    "changeFileButton": "Change Video",
+    "ready": "Ready ✓",
+    "mismatchWarningTitle": "Video duration mismatch detected",
+    "mismatchWarningText": "Your partner's video duration differs by more than 3 seconds. Please ensure both of you selected the exact same movie cut.",
+    "dismissWarning": "Continue anyway",
+    "waitingHostPlay": "Waiting for host to press play...",
+    "hostOnlyControl": "Playback is controlled by the Host",
+    "finishedTitle": "Movie finished ❤️",
+    "replay": "Replay Movie",
+    "chooseAnother": "Choose Another Video"
+  },
+  "chat": {
+    "title": "Chat",
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "empty": "No messages yet. Say something ❤️",
+    "you": "You"
+  },
+  "voice": {
+    "title": "Voice",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "speaking": "Speaking",
+    "connecting": "Connecting voice...",
+    "connected": "Voice connected",
+    "unavailable": "Voice unavailable"
+  },
+  "settings": {
+    "title": "Room Settings",
+    "playbackControl": "Playback Control",
+    "hostOnly": "Host only",
+    "everyone": "Everyone",
+    "autoSync": "Auto-sync Latency Correction",
+    "voiceChat": "Voice Chat",
+    "chat": "Text Chat",
+    "reactions": "Floating Reactions",
+    "language": "Language",
+    "close": "Close"
+  },
+  "inviteModal": {
+    "title": "Invite to Movie Night ❤️",
+    "roomCode": "Room Code",
+    "inviteLink": "Invite Link",
+    "copyLink": "Copy Link",
+    "copyCode": "Copy Code",
+    "copied": "✓ Copied"
+  },
+  "footer": {
+    "description": "Watch together. Wherever you are.",
+    "privacyStatement": "Videos are played locally on your device. CineMate does not upload or store your movie files.",
+    "copyright": "Built with love for movie lovers everywhere."
+  },
+  "errors": {
+    "invalidRoom": "Room not found. The room may have expired or the link is incorrect.",
+    "chooseVideoFirst": "Please choose a video file first.",
+    "voiceFailed": "Voice chat couldn't connect. You can continue watching and chatting.",
+    "networkLost": "Connection lost. Trying to reconnect..."
+  }
+}

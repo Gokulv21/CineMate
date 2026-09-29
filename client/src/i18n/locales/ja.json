@@ -1,0 +1,145 @@
+{
+  "brand": {
+    "name": "CineMate",
+    "tagline": "離れていても、同じ映画を一緒に。",
+    "privacyBadge": "動画ファイルはお使いのデバイス内に留まります。サーバーへのアップロードは一切ありません。"
+  },
+  "nav": {
+    "howItWorks": "使い方",
+    "features": "特徴",
+    "privacy": "プライバシー",
+    "createRoom": "ルームを作成",
+    "joinRoom": "ルームに参加"
+  },
+  "hero": {
+    "title": "距離があっても、映画の夜は終わらない。",
+    "subtitle": "遠く離れていても、リアルタイムで同期再生しながら、通話・チャット・リアクションで一緒に楽しめます。",
+    "createButton": "ルームを作成",
+    "joinButton": "ルームに参加",
+    "badge": "リアルタイム同期 • ボイスチャット • 完全プライベート"
+  },
+  "howItWorks": {
+    "title": "仕組み",
+    "subtitle": "かんたん3ステップで完璧に同期したシアター体験",
+    "step1Title": "ルームを作成",
+    "step1Desc": "プライベートなルームを作成し、招待リンクまたはコードをお相手に送ります。",
+    "step2Title": "映画ファイルを選択",
+    "step2Desc": "各自がお手持ちのローカル動画ファイルを選択します。動画がサーバーに送信されることはありません。",
+    "step3Title": "一緒に観る",
+    "step3Desc": "再生・一時停止・シーク、通話、チャット、リアクションがすべてリアルタイムで同期します。",
+    "privacyNote": "映画ファイルはお客様のブラウザ内でのみ再生されます。サーバーへの保存や送信は一切行いません。"
+  },
+  "features": {
+    "title": "ふたりのための特別な映画体験",
+    "syncTitle": "ミリ秒精度の同期",
+    "syncDesc": "再生速度のスマートな微調整により、カクつくことなく滑らかに再生位置を一致させます。",
+    "voiceTitle": "クリアなボイスチャット",
+    "voiceDesc": "WebRTC P2Pによる高音質通話。発話インジケーターやミュートも完備。",
+    "privacyTitle": "安心のローカル再生",
+    "privacyDesc": "ブラウザ標準のFile APIを使用。通信量の無駄やプライバシーの心配はありません。",
+    "reactionsTitle": "リアルタイムリアクション",
+    "reactionsDesc": "感動や笑いの瞬間を、画面に舞うスタンプで共有できます。"
+  },
+  "createModal": {
+    "title": "ルームを作成 ❤️",
+    "subtitle": "大切な人と過ごすプライベートな映画時間",
+    "nameLabel": "あなたのお名前",
+    "namePlaceholder": "例: たろう",
+    "roomNameLabel": "ルーム名 (任意)",
+    "roomNamePlaceholder": "例: 今夜の映画会 ❤️",
+    "submitButton": "ルームを作成",
+    "readyTitle": "ルームの準備ができました ❤️",
+    "readySubtitle": "ルームコードまたは招待リンクをお相手に共有してください",
+    "roomCodeLabel": "ルームコード",
+    "copyLink": "招待リンクをコピー",
+    "copyCode": "コードをコピー",
+    "enterRoom": "ルームに入る",
+    "copied": "コピー完了！"
+  },
+  "joinModal": {
+    "title": "ルームに参加",
+    "subtitle": "6桁のルームコードを入力してお相手の部屋に参加します",
+    "roomCodeLabel": "ルームコード",
+    "roomCodePlaceholder": "例: AB7XK9",
+    "nameLabel": "あなたのお名前",
+    "namePlaceholder": "例: はなこ",
+    "submitButton": "ルームに参加",
+    "notFound": "このルームは存在しないか、有効期限が切れています。"
+  },
+  "room": {
+    "online": "人が視聴中",
+    "invite": "招待",
+    "settings": "設定",
+    "leave": "退出",
+    "hostBadge": "ホスト",
+    "connecting": "接続中...",
+    "connected": "接続完了",
+    "reconnecting": "再接続中...",
+    "disconnected": "切断されました",
+    "leaveConfirm": "ルームを退出しますか？",
+    "waitingForPartner": "お相手の参加を待っています... 招待リンクを共有してください。",
+    "copyInviteLink": "招待リンクをコピー"
+  },
+  "video": {
+    "chooseMovie": "映画を選択してください",
+    "localNotice": "動画はお使いのデバイス内にのみ留まり、CineMateにアップロードされることはありません。",
+    "chooseFileButton": "動画ファイルを選択",
+    "changeFileButton": "別の動画を選択",
+    "ready": "準備完了 ✓",
+    "mismatchWarningTitle": "動画の再生時間に差があります",
+    "mismatchWarningText": "お相手が選択した動画と再生時間が3秒以上異なります。同じバージョンの映画を選択しているかご確認ください。",
+    "dismissWarning": "そのまま続ける",
+    "waitingHostPlay": "ホストが再生を開始するのを待っています...",
+    "hostOnlyControl": "再生操作はホストのみ可能です",
+    "finishedTitle": "映画が終わりました ❤️",
+    "replay": "もう一度観る",
+    "chooseAnother": "別の映画を選ぶ"
+  },
+  "chat": {
+    "title": "チャット",
+    "placeholder": "メッセージを入力...",
+    "send": "送信",
+    "empty": "まだメッセージはありません。声をかけてみましょう ❤️",
+    "you": "あなた"
+  },
+  "voice": {
+    "title": "通話",
+    "mute": "ミュート",
+    "unmute": "ミュート解除",
+    "speaking": "発話中",
+    "connecting": "通話に接続中...",
+    "connected": "通話接続中",
+    "unavailable": "通話利用不可"
+  },
+  "settings": {
+    "title": "ルーム設定",
+    "playbackControl": "再生コントロール権限",
+    "hostOnly": "ホストのみ",
+    "everyone": "全員",
+    "autoSync": "自動同期・補正",
+    "voiceChat": "ボイスチャット",
+    "chat": "テキストチャット",
+    "reactions": "フローティングリアクション",
+    "language": "言語",
+    "close": "閉じる"
+  },
+  "inviteModal": {
+    "title": "映画鑑賞に招待 ❤️",
+    "roomCode": "ルームコード",
+    "inviteLink": "招待リンク",
+    "copyLink": "リンクをコピー",
+    "copyCode": "コードをコピー",
+    "copied": "✓ コピーしました"
+  },
+  "footer": {
+    "description": "離れていても、同じ映画を一緒に。",
+    "privacyStatement": "動画はご利用の端末上で直接再生されます。CineMateが動画ファイルを保管・送信することはありません。",
+    "copyright": "Built with love for movie lovers everywhere."
+  },
+  "errors": {
+    "invalidRoom": "ルームが見つかりません。有効期限切れかリンクが正しくない可能性があります。",
+    "chooseVideoFirst": "先に動画ファイルを選択してください。",
+    "voiceFailed": "ボイスチャットに接続できませんでした。動画の視聴とチャットは引き続きご利用いただけます。",
+    "networkLost": "接続が切れました。再接続を試みています..."
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "cinemate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CineMate - Private synchronized movie watching web application",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "npm run --prefix client dev",
+    "dev:server": "npm run --prefix server dev",
+    "build": "npm run build:server && npm run build:client",
+    "build:client": "npm run --prefix client build",
+    "build:server": "npm run --prefix server build",
+    "start": "npm run --prefix server start",
+    "test": "npm run --prefix server test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

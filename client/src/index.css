@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 346 84% 60%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 5% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 6% 15%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 346 77% 50%;
+    --accent-foreground: 0 0% 98%;
+    --border: 240 6% 16%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    border-color: #232530;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #08090d;
+    color: #f3f4f6;
+    font-family: 'Inter', 'Noto Sans JP', 'Noto Sans Tamil', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Custom Cinema Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 17, 23, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.6);
+}
+
+/* Glass and Cinema Surfaces */
+.cinema-surface {
+  background-color: rgba(14, 16, 22, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.cinema-glow {
+  box-shadow: 0 0 50px -10px rgba(225, 29, 72, 0.15);
+}
+
+.cinema-screen-shadow {
+  box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px -5px rgba(225, 29, 72, 0.1);
+}
+
+/* Interactive Slider styling */
+input[type="range"] {
+  accent-color: #e11d48;
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(0) scale(0.8) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-80px) scale(1.2) rotate(-8deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-160px) scale(1) rotate(6deg);
+    opacity: 0;
+  }
+}
+
+.animate-float-up {
+  animation: float-up 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
