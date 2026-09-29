@@ -6,8 +6,9 @@ import {
   Settings as SettingsIcon, 
   Share2, 
   LogOut, 
-  Radio, 
-  MessageSquare
+  Mic,
+  MicOff,
+  Volume2
 } from 'lucide-react';
 import type { 
   Room, 
@@ -53,7 +54,6 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'chat' | 'voice'>('chat');
   const [partnerMetadata, setPartnerMetadata] = useState<VideoMetadata | undefined>(undefined);
 
   useEffect(() => {
@@ -176,7 +176,7 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
       unsubMsg();
       wsService.disconnect();
     };
-  }, [roomId, userName]);
+  }, [roomId, userName, t]);
 
   const isHost = room ? room.hostId === myParticipantId : false;
   const canControl = room 
@@ -202,6 +202,8 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
     voiceStatus,
     isMuted,
     isSpeakingLocally,
+    remoteSpeakingPeers,
+    partnerIsSpeaking,
     toggleMute,
     retryAudio
   } = useWebRTCVoice({
@@ -209,6 +211,23 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
     participantIds,
     enabled: room?.settings.voiceChat ?? true
   });
+
+  // Smart Audio Ducking: When partner speaks, duck video volume to 35% so their voice is crystal clear
+  const previousVolumeRef = useRef<number>(1.0);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (partnerIsSpeaking) {
+      previousVolumeRef.current = video.volume;
+      video.volume = Math.min(video.volume, 0.35);
+    } else {
+      video.volume = previousVolumeRef.current;
+    }
+  }, [partnerIsSpeaking]);
+
+  const partner = room?.participants.find(p => p.id !== myParticipantId);
+  const partnerName = partner?.name || '';
 
   const handleVideoSelected = useCallback((metadata: { fileName: string; duration: number; size?: number }) => {
     wsService.sendMessage({
@@ -264,7 +283,7 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           <span className="text-zinc-600 hidden md:inline">•</span>
 
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <h2 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs">
+            <h2 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate max-w-[120px] xs:max-w-[180px] sm:max-w-xs">
               {room?.name || 'Movie Night 💚'}
             </h2>
           </div>
@@ -272,6 +291,50 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
 
         {/* Right Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Partner Speaking Indicator (When someone else is talking) */}
+          {partnerIsSpeaking && (
+            <div className="inline-flex items-center gap-1.5 h-8 px-2 sm:px-2.5 rounded-lg bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-xs font-semibold animate-pulse shadow-md shadow-emerald-950/40">
+              <Volume2 className="w-3.5 h-3.5 shrink-0 text-emerald-400 animate-bounce" />
+              <span className="truncate max-w-[90px] sm:max-w-[130px]">
+                {partnerName || 'Partner'}
+              </span>
+            </div>
+          )}
+
+          {/* Quick Voice Mute / Unmute Symbol (Always available without tabs) */}
+          {room?.settings.voiceChat && (
+            <button
+              type="button"
+              onClick={toggleMute}
+              className={`inline-flex items-center justify-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg font-semibold text-xs transition-all cursor-pointer select-none active:scale-95 ${
+                isMuted
+                  ? 'bg-zinc-900/90 hover:bg-zinc-800 text-rose-400 border border-rose-900/50 hover:border-rose-700/60 shadow-sm'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950/40 ring-1 ring-emerald-400/40'
+              }`}
+              title={isMuted ? t('voice.unmute') : t('voice.mute')}
+              aria-label={isMuted ? t('voice.unmute') : t('voice.mute')}
+            >
+              {isMuted ? (
+                <>
+                  <MicOff className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                  <span className="hidden sm:inline font-medium">{t('voice.mute')}</span>
+                </>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Mic className="w-3.5 h-3.5 shrink-0 text-white" />
+                    {isSpeakingLocally && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white animate-ping" />
+                    )}
+                  </div>
+                  <span className="hidden sm:inline font-medium">
+                    {isSpeakingLocally ? t('voice.speaking') : t('voice.title')}
+                  </span>
+                </>
+              )}
+            </button>
+          )}
+
           {/* Connection Status Badge */}
           <div 
             className="inline-flex items-center justify-center h-8 px-2 sm:px-2.5 rounded-lg bg-zinc-900/90 border border-emerald-900/30 text-[11px] font-medium text-zinc-300"
@@ -363,53 +426,15 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
             />
           </div>
 
-          {/* Mobile Tab Selector */}
-          <div className="flex lg:hidden mt-2.5 border-b border-zinc-800/80 shrink-0">
-            <button
-              onClick={() => setMobileTab('chat')}
-              className={`flex-1 py-2 text-xs font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-                mobileTab === 'chat'
-                  ? 'border-emerald-500 text-emerald-400'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>{t('chat.title')} ({messages.length})</span>
-            </button>
-            <button
-              onClick={() => setMobileTab('voice')}
-              className={`flex-1 py-2 text-xs font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-                mobileTab === 'voice'
-                  ? 'border-emerald-500 text-emerald-400'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              <Radio className="w-3.5 h-3.5" />
-              <span>{t('voice.title')} ({participantCount})</span>
-            </button>
-          </div>
-
-          {/* Mobile Bottom Sheet/Panel */}
-          <div className="lg:hidden flex-1 min-h-[200px] max-h-[280px] mt-2 overflow-hidden">
-            {mobileTab === 'chat' ? (
-              <ChatPanel
-                messages={messages}
-                currentParticipantId={myParticipantId}
-                onSendMessage={handleSendMessage}
-                onSendReaction={handleSendReaction}
-                reactionsEnabled={room?.settings.reactionsEnabled ?? true}
-              />
-            ) : (
-              <VoiceControls
-                participants={room?.participants || []}
-                currentParticipantId={myParticipantId}
-                voiceStatus={voiceStatus}
-                isMuted={isMuted}
-                isSpeakingLocally={isSpeakingLocally}
-                onToggleMute={toggleMute}
-                onRetryVoice={retryAudio}
-              />
-            )}
+          {/* Mobile Bottom Area: Direct Chat without separate tabs! */}
+          <div className="lg:hidden flex-1 min-h-[190px] max-h-[260px] mt-2.5 overflow-hidden">
+            <ChatPanel
+              messages={messages}
+              currentParticipantId={myParticipantId}
+              onSendMessage={handleSendMessage}
+              onSendReaction={handleSendReaction}
+              reactionsEnabled={room?.settings.reactionsEnabled ?? true}
+            />
           </div>
         </div>
 
@@ -422,6 +447,7 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
               voiceStatus={voiceStatus}
               isMuted={isMuted}
               isSpeakingLocally={isSpeakingLocally}
+              remoteSpeakingPeers={remoteSpeakingPeers}
               onToggleMute={toggleMute}
               onRetryVoice={retryAudio}
             />

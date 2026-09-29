@@ -8,13 +8,48 @@ interface WebRTCVoiceProps {
   enabled: boolean;
 }
 
-const DEFAULT_STUN_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun3.l.google.com:19302' },
-  { urls: 'stun:stun4.l.google.com:19302' },
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  // Google Public STUN
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
+  // Cloudflare Public STUN
+  { urls: ['stun:stun.cloudflare.com:3478'] },
+  // OpenRelay Public TURN (Essential for mobile 4G/5G Symmetric NAT & carrier firewalls)
+  {
+    urls: [
+      'turn:openrelay.metered.ca:80',
+      'turn:openrelay.metered.ca:443',
+      'turn:openrelay.metered.ca:443?transport=tcp'
+    ],
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  }
 ];
+
+// Helper to enhance SDP with Opus FEC (Forward Error Correction) & optimal bitrate like Google Meet / WhatsApp
+function enhanceSdpForVoice(sdp: string): string {
+  return sdp.replace(
+    /a=fmtp:(\d+) (.*)/g,
+    (match, payloadType, params) => {
+      if (sdp.includes(`a=rtpmap:${payloadType} opus/48000`)) {
+        let enhanced = params;
+        if (!enhanced.includes('useinbandfec=1')) {
+          enhanced += ';useinbandfec=1';
+        }
+        if (!enhanced.includes('minptime=')) {
+          enhanced += ';minptime=10';
+        }
+        if (!enhanced.includes('maxaveragebitrate=')) {
+          enhanced += ';maxaveragebitrate=64000';
+        }
+        if (!enhanced.includes('stereo=')) {
+          enhanced += ';stereo=0;sprop-stereo=0';
+        }
+        return `a=fmtp:${payloadType} ${enhanced}`;
+      }
+      return match;
+    }
+  );
+}
 
 export function useWebRTCVoice({
   myParticipantId,
@@ -27,20 +62,43 @@ export function useWebRTCVoice({
   isMutedRef.current = isMuted;
 
   const [isSpeakingLocally, setIsSpeakingLocally] = useState<boolean>(false);
+  const [remoteSpeakingPeers, setRemoteSpeakingPeers] = useState<string[]>([]);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const remoteAudioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const remoteSpeakingIntervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const speechIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const getIceServers = useCallback((): RTCIceServer[] => {
     if (import.meta.env.VITE_STUN_URL) {
-      return [{ urls: import.meta.env.VITE_STUN_URL.split(',') }];
+      const urls = import.meta.env.VITE_STUN_URL.split(',').map((u: string) => u.trim());
+      return [{ urls }, ...DEFAULT_ICE_SERVERS];
     }
-    return DEFAULT_STUN_SERVERS;
+    return DEFAULT_ICE_SERVERS;
   }, []);
+
+  // Unlock all audio elements and AudioContext on user interaction (resolves iOS/Android autoplay policy)
+  const unlockAudioContext = useCallback(() => {
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(() => {});
+    }
+    remoteAudioElementsRef.current.forEach((audioEl) => {
+      audioEl.play().catch(() => {});
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleGesture = () => unlockAudioContext();
+    window.addEventListener('click', handleGesture);
+    window.addEventListener('touchstart', handleGesture);
+    return () => {
+      window.removeEventListener('click', handleGesture);
+      window.removeEventListener('touchstart', handleGesture);
+    };
+  }, [unlockAudioContext]);
 
   // Drain and apply queued early ICE candidates once remote description is set
   const drainIceCandidates = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
@@ -78,7 +136,7 @@ export function useWebRTCVoice({
     });
   }, []);
 
-  const startAudio = useCallback(async () => {
+  const startAudio = useCallback(async (autoUnmute = false) => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setVoiceStatus('ERROR');
       return;
@@ -88,32 +146,51 @@ export function useWebRTCVoice({
       setVoiceStatus('CONNECTING');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
+          echoCancellation: { ideal: true },
+          noiseSuppression: { ideal: true },
+          autoGainControl: { ideal: true },
+          channelCount: { ideal: 1 },
+          sampleRate: { ideal: 48000 },
+          // Enhanced Chromium & WebKit voice clarity flags
+          ...({
+            googEchoCancellation: true,
+            googAutoGainControl: true,
+            googNoiseSuppression: true,
+            googHighpassFilter: true,
+            googTypingNoiseDetection: true
+          } as any)
         },
         video: false
       });
 
       localStreamRef.current = stream;
 
+      const initialMuteState = autoUnmute ? false : isMutedRef.current;
+      setIsMuted(initialMuteState);
+      isMutedRef.current = initialMuteState;
+
       // Sync initial muted state on the hardware tracks
       stream.getAudioTracks().forEach((track) => {
-        track.enabled = !isMutedRef.current;
+        track.enabled = !initialMuteState;
       });
 
-      // Crucial: Seamlessly push mic track to all peer connections already created
+      // Seamlessly push mic track to all peer connections
       const audioTrack = stream.getAudioTracks()[0];
       if (audioTrack) {
         attachTrackToPeerConnections(audioTrack);
       }
 
-      // Voice activity detector
+      // Voice activity detector for local speaker visualization
       try {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioCtx) {
-          const audioCtx = new AudioCtx();
-          audioContextRef.current = audioCtx;
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AudioCtx();
+          }
+          const audioCtx = audioContextRef.current;
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+          }
           const source = audioCtx.createMediaStreamSource(stream);
           const analyser = audioCtx.createAnalyser();
           analyser.fftSize = 256;
@@ -132,7 +209,7 @@ export function useWebRTCVoice({
               sum += dataArray[i];
             }
             const avg = sum / dataArray.length;
-            setIsSpeakingLocally(avg > 18);
+            setIsSpeakingLocally(avg > 16);
           }, 150);
         }
       } catch (err) {
@@ -153,13 +230,13 @@ export function useWebRTCVoice({
     }
 
     pc = new RTCPeerConnection({
-      iceServers: getIceServers()
+      iceServers: getIceServers(),
+      iceCandidatePoolSize: 2
     });
 
     peerConnectionsRef.current.set(targetId, pc);
 
-    // Pre-allocate audio transceiver with sendrecv. This guarantees the SDP contains an audio m-line
-    // even if mic permissions are still pending on mobile!
+    // Pre-allocate audio transceiver with sendrecv. SDP will contain an audio m-line
     const transceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
 
     // If local mic track is already active, attach it right now
@@ -187,16 +264,26 @@ export function useWebRTCVoice({
         audioEl.id = `remote-audio-${targetId}`;
         audioEl.autoplay = true;
         (audioEl as any).playsInline = true;
-        audioEl.style.display = 'none';
+        audioEl.setAttribute('playsinline', 'true');
+        audioEl.setAttribute('webkit-playsinline', 'true');
+        audioEl.volume = 1.0;
+        // Position off-screen instead of display:none to prevent mobile OS power throttling!
+        audioEl.style.position = 'fixed';
+        audioEl.style.top = '-9999px';
+        audioEl.style.left = '-9999px';
+        audioEl.style.width = '1px';
+        audioEl.style.height = '1px';
+        audioEl.style.opacity = '0.01';
+        audioEl.style.pointerEvents = 'none';
         document.body.appendChild(audioEl);
         remoteAudioElementsRef.current.set(targetId, audioEl);
       }
 
-      if (event.streams && event.streams[0]) {
-        audioEl.srcObject = event.streams[0];
-      } else if (event.track) {
-        audioEl.srcObject = new MediaStream([event.track]);
-      }
+      const streamToPlay = (event.streams && event.streams[0]) 
+        ? event.streams[0] 
+        : new MediaStream([event.track]);
+
+      audioEl.srcObject = streamToPlay;
 
       const playPromise = audioEl.play();
       if (playPromise !== undefined) {
@@ -204,12 +291,57 @@ export function useWebRTCVoice({
           console.warn('[WEBRTC] Audio autoplay blocked, waiting for user gesture:', e);
           const resumeAudio = () => {
             audioEl?.play().catch(() => {});
+            if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+              audioContextRef.current.resume().catch(() => {});
+            }
             window.removeEventListener('click', resumeAudio);
             window.removeEventListener('touchstart', resumeAudio);
           };
           window.addEventListener('click', resumeAudio, { once: true });
           window.addEventListener('touchstart', resumeAudio, { once: true });
         });
+      }
+
+      // Route stream through Web Audio API for remote speaking detection and fallback playback
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AudioCtx();
+          }
+          const audioCtx = audioContextRef.current;
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+          }
+          const remoteSource = audioCtx.createMediaStreamSource(streamToPlay);
+          const remoteAnalyser = audioCtx.createAnalyser();
+          remoteAnalyser.fftSize = 256;
+          remoteSource.connect(remoteAnalyser);
+
+          // Monitor remote partner voice activity (for partner is speaking indicator)
+          const remoteData = new Uint8Array(remoteAnalyser.frequencyBinCount);
+          if (remoteSpeakingIntervalsRef.current.has(targetId)) {
+            clearInterval(remoteSpeakingIntervalsRef.current.get(targetId)!);
+          }
+          const remoteInterval = setInterval(() => {
+            remoteAnalyser.getByteFrequencyData(remoteData);
+            let sum = 0;
+            for (let i = 0; i < remoteData.length; i++) {
+              sum += remoteData[i];
+            }
+            const avg = sum / remoteData.length;
+            const isSpeaking = avg > 14;
+            setRemoteSpeakingPeers(prev => {
+              const has = prev.includes(targetId);
+              if (isSpeaking && !has) return [...prev, targetId];
+              if (!isSpeaking && has) return prev.filter(id => id !== targetId);
+              return prev;
+            });
+          }, 150);
+          remoteSpeakingIntervalsRef.current.set(targetId, remoteInterval);
+        }
+      } catch (err) {
+        console.warn('[WEBRTC] Remote speaking detector unavailable:', err);
       }
     };
 
@@ -233,14 +365,16 @@ export function useWebRTCVoice({
         offerToReceiveAudio: true,
         offerToReceiveVideo: false
       });
-      await pc.setLocalDescription(offer);
+      const enhancedSdp = enhanceSdpForVoice(offer.sdp || '');
+      const enhancedOffer = new RTCSessionDescription({ type: offer.type, sdp: enhancedSdp });
+      await pc.setLocalDescription(enhancedOffer);
 
       wsService.sendMessage({
         type: 'WEBRTC_OFFER',
         target: targetId,
         offer: {
-          type: offer.type,
-          sdp: offer.sdp
+          type: enhancedOffer.type,
+          sdp: enhancedOffer.sdp
         }
       });
     } catch (err) {
@@ -260,14 +394,16 @@ export function useWebRTCVoice({
           await drainIceCandidates(from, pc);
 
           const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
+          const enhancedSdp = enhanceSdpForVoice(answer.sdp || '');
+          const enhancedAnswer = new RTCSessionDescription({ type: answer.type, sdp: enhancedSdp });
+          await pc.setLocalDescription(enhancedAnswer);
 
           wsService.sendMessage({
             type: 'WEBRTC_ANSWER',
             target: from,
             answer: {
-              type: answer.type,
-              sdp: answer.sdp
+              type: enhancedAnswer.type,
+              sdp: enhancedAnswer.sdp
             }
           });
         } catch (err) {
@@ -311,6 +447,13 @@ export function useWebRTCVoice({
         }
         pendingCandidatesRef.current.delete(msg.participantId);
 
+        if (remoteSpeakingIntervalsRef.current.has(msg.participantId)) {
+          clearInterval(remoteSpeakingIntervalsRef.current.get(msg.participantId)!);
+          remoteSpeakingIntervalsRef.current.delete(msg.participantId);
+        }
+
+        setRemoteSpeakingPeers(prev => prev.filter(id => id !== msg.participantId));
+
         const audio = remoteAudioElementsRef.current.get(msg.participantId);
         if (audio) {
           audio.pause();
@@ -342,13 +485,16 @@ export function useWebRTCVoice({
 
   useEffect(() => {
     if (enabled && voiceStatus === 'DISCONNECTED') {
-      startAudio();
+      startAudio(false);
     }
   }, [enabled, voiceStatus, startAudio]);
 
   const toggleMute = useCallback(() => {
+    unlockAudioContext();
+
     if (!localStreamRef.current) {
-      startAudio().then(() => {
+      // First click: start audio unmuted with user gesture
+      startAudio(true).then(() => {
         setIsMuted(false);
         isMutedRef.current = false;
         if (localStreamRef.current) {
@@ -377,11 +523,13 @@ export function useWebRTCVoice({
       type: 'MUTE_STATUS',
       isMuted: nextMuted
     });
-  }, [isMuted, startAudio, attachTrackToPeerConnections]);
+  }, [isMuted, startAudio, attachTrackToPeerConnections, unlockAudioContext]);
 
   useEffect(() => {
     return () => {
       if (speechIntervalRef.current) clearInterval(speechIntervalRef.current);
+      remoteSpeakingIntervalsRef.current.forEach((interval) => clearInterval(interval));
+      remoteSpeakingIntervalsRef.current.clear();
       if (audioContextRef.current) {
         audioContextRef.current.close().catch(() => {});
       }
@@ -406,7 +554,9 @@ export function useWebRTCVoice({
     voiceStatus,
     isMuted,
     isSpeakingLocally,
+    remoteSpeakingPeers,
+    partnerIsSpeaking: remoteSpeakingPeers.length > 0,
     toggleMute,
-    retryAudio: startAudio
+    retryAudio: () => startAudio(false)
   };
 }
