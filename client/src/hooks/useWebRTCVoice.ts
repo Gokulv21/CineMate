@@ -13,7 +13,7 @@ const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
   // Cloudflare Public STUN
   { urls: ['stun:stun.cloudflare.com:3478'] },
-  // OpenRelay Public TURN (Essential for mobile 4G/5G Symmetric NAT & carrier firewalls)
+  // OpenRelay Public TURN (Essential for Japan UQ <-> India Jio cross-border mobile carrier traversal)
   {
     urls: [
       'turn:openrelay.metered.ca:80',
@@ -71,6 +71,7 @@ export function useWebRTCVoice({
   const remoteSpeakingIntervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const speechIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isRenegotiatingRef = useRef<Map<string, boolean>>(new Map());
 
   const getIceServers = useCallback((): RTCIceServer[] => {
     if (import.meta.env.VITE_STUN_URL) {
@@ -80,7 +81,7 @@ export function useWebRTCVoice({
     return DEFAULT_ICE_SERVERS;
   }, []);
 
-  // Unlock all audio elements and AudioContext on user interaction (resolves iOS/Android autoplay policy)
+  // Unlock all audio elements and AudioContext on user interaction
   const unlockAudioContext = useCallback(() => {
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume().catch(() => {});
@@ -136,6 +137,184 @@ export function useWebRTCVoice({
     });
   }, []);
 
+  const getOrCreatePeerConnection = useCallback((targetId: string): RTCPeerConnection => {
+    let pc = peerConnectionsRef.current.get(targetId);
+    if (pc && pc.connectionState !== 'closed') {
+      return pc;
+    }
+
+    pc = new RTCPeerConnection({
+      iceServers: getIceServers(),
+      iceCandidatePoolSize: 2
+    });
+
+    peerConnectionsRef.current.set(targetId, pc);
+
+    // Pre-allocate audio transceiver with sendrecv. This ensures both sides negotiate two-way audio!
+    const transceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
+
+    // If local mic track is already active, attach it right now
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        transceiver.sender.replaceTrack(audioTrack).catch(() => {});
+      }
+    }
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        wsService.sendMessage({
+          type: 'ICE_CANDIDATE',
+          target: targetId,
+          candidate: event.candidate.toJSON()
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      let audioContainer = document.getElementById('cinemate-voice-container');
+      if (!audioContainer) {
+        audioContainer = document.createElement('div');
+        audioContainer.id = 'cinemate-voice-container';
+        // In-viewport bottom element to prevent mobile Chrome/Safari from pausing it as "offscreen background"!
+        audioContainer.style.position = 'fixed';
+        audioContainer.style.bottom = '0';
+        audioContainer.style.right = '0';
+        audioContainer.style.width = '1px';
+        audioContainer.style.height = '1px';
+        audioContainer.style.overflow = 'hidden';
+        audioContainer.style.opacity = '0.01';
+        audioContainer.style.pointerEvents = 'none';
+        audioContainer.style.zIndex = '1';
+        document.body.appendChild(audioContainer);
+      }
+
+      let audioEl = remoteAudioElementsRef.current.get(targetId);
+      if (!audioEl) {
+        audioEl = document.createElement('audio');
+        audioEl.id = `remote-audio-${targetId}`;
+        audioEl.autoplay = true;
+        (audioEl as any).playsInline = true;
+        audioEl.setAttribute('playsinline', 'true');
+        audioEl.setAttribute('webkit-playsinline', 'true');
+        audioEl.volume = 1.0;
+        audioContainer.appendChild(audioEl);
+        remoteAudioElementsRef.current.set(targetId, audioEl);
+      }
+
+      const streamToPlay = (event.streams && event.streams[0]) 
+        ? event.streams[0] 
+        : new MediaStream([event.track]);
+
+      audioEl.srcObject = streamToPlay;
+
+      audioEl.play().catch((e) => {
+        console.warn('[WEBRTC] Audio autoplay waiting for gesture:', e);
+      });
+
+      // Route stream through Web Audio API destination with volume boost
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AudioCtx();
+          }
+          const audioCtx = audioContextRef.current;
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+          }
+          const remoteSource = audioCtx.createMediaStreamSource(streamToPlay);
+          const remoteGain = audioCtx.createGain();
+          remoteGain.gain.value = 1.25; // 25% boost for voice clarity over movies
+          remoteSource.connect(remoteGain);
+          remoteGain.connect(audioCtx.destination);
+
+          // Monitor remote partner voice activity (for partner is speaking indicator)
+          const remoteAnalyser = audioCtx.createAnalyser();
+          remoteAnalyser.fftSize = 256;
+          remoteSource.connect(remoteAnalyser);
+
+          const remoteData = new Uint8Array(remoteAnalyser.frequencyBinCount);
+          if (remoteSpeakingIntervalsRef.current.has(targetId)) {
+            clearInterval(remoteSpeakingIntervalsRef.current.get(targetId)!);
+          }
+          const remoteInterval = setInterval(() => {
+            remoteAnalyser.getByteFrequencyData(remoteData);
+            let sum = 0;
+            for (let i = 0; i < remoteData.length; i++) {
+              sum += remoteData[i];
+            }
+            const avg = sum / remoteData.length;
+            const isSpeaking = avg > 14;
+            setRemoteSpeakingPeers(prev => {
+              const has = prev.includes(targetId);
+              if (isSpeaking && !has) return [...prev, targetId];
+              if (!isSpeaking && has) return prev.filter(id => id !== targetId);
+              return prev;
+            });
+          }, 150);
+          remoteSpeakingIntervalsRef.current.set(targetId, remoteInterval);
+        }
+      } catch (err) {
+        console.warn('[WEBRTC] Remote audio processing error:', err);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc!.connectionState === 'failed' || pc!.connectionState === 'disconnected') {
+        if (typeof pc!.restartIce === 'function') {
+          pc!.restartIce();
+        }
+      }
+    };
+
+    return pc;
+  }, [getIceServers]);
+
+  const callPeer = useCallback(async (targetId: string) => {
+    if (!myParticipantId || targetId === myParticipantId) return;
+
+    try {
+      const pc = getOrCreatePeerConnection(targetId);
+      isRenegotiatingRef.current.set(targetId, true);
+
+      // Explicitly ensure transceiver direction is sendrecv
+      const transceivers = pc.getTransceivers();
+      const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
+      if (audioTransceiver) {
+        audioTransceiver.direction = 'sendrecv';
+      }
+
+      if (localStreamRef.current) {
+        const audioTrack = localStreamRef.current.getAudioTracks()[0];
+        if (audioTrack && audioTransceiver) {
+          await audioTransceiver.sender.replaceTrack(audioTrack).catch(() => {});
+        }
+      }
+
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false
+      });
+      const enhancedSdp = enhanceSdpForVoice(offer.sdp || '');
+      const enhancedOffer = new RTCSessionDescription({ type: offer.type, sdp: enhancedSdp });
+      await pc.setLocalDescription(enhancedOffer);
+
+      wsService.sendMessage({
+        type: 'WEBRTC_OFFER',
+        target: targetId,
+        offer: {
+          type: enhancedOffer.type,
+          sdp: enhancedOffer.sdp
+        }
+      });
+    } catch (err) {
+      console.error(`[WEBRTC] Error calling peer ${targetId}:`, err);
+    } finally {
+      isRenegotiatingRef.current.set(targetId, false);
+    }
+  }, [myParticipantId, getOrCreatePeerConnection]);
+
   const startAudio = useCallback(async (autoUnmute = false) => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setVoiceStatus('ERROR');
@@ -174,10 +353,16 @@ export function useWebRTCVoice({
         track.enabled = !initialMuteState;
       });
 
-      // Seamlessly push mic track to all peer connections
+      // Push mic track to all peer connections
       const audioTrack = stream.getAudioTracks()[0];
       if (audioTrack) {
         attachTrackToPeerConnections(audioTrack);
+        // Renegotiate with existing peers so both directions are active!
+        participantIds.forEach((targetId) => {
+          if (targetId !== myParticipantId) {
+            callPeer(targetId);
+          }
+        });
       }
 
       // Voice activity detector for local speaker visualization
@@ -221,166 +406,7 @@ export function useWebRTCVoice({
       console.warn('[WEBRTC] Could not access microphone:', err.message);
       setVoiceStatus('ERROR');
     }
-  }, [attachTrackToPeerConnections]);
-
-  const getOrCreatePeerConnection = useCallback((targetId: string): RTCPeerConnection => {
-    let pc = peerConnectionsRef.current.get(targetId);
-    if (pc && pc.connectionState !== 'closed') {
-      return pc;
-    }
-
-    pc = new RTCPeerConnection({
-      iceServers: getIceServers(),
-      iceCandidatePoolSize: 2
-    });
-
-    peerConnectionsRef.current.set(targetId, pc);
-
-    // Pre-allocate audio transceiver with sendrecv. SDP will contain an audio m-line
-    const transceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
-
-    // If local mic track is already active, attach it right now
-    if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        transceiver.sender.replaceTrack(audioTrack).catch(() => {});
-      }
-    }
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        wsService.sendMessage({
-          type: 'ICE_CANDIDATE',
-          target: targetId,
-          candidate: event.candidate.toJSON()
-        });
-      }
-    };
-
-    pc.ontrack = (event) => {
-      let audioEl = remoteAudioElementsRef.current.get(targetId);
-      if (!audioEl) {
-        audioEl = document.createElement('audio');
-        audioEl.id = `remote-audio-${targetId}`;
-        audioEl.autoplay = true;
-        (audioEl as any).playsInline = true;
-        audioEl.setAttribute('playsinline', 'true');
-        audioEl.setAttribute('webkit-playsinline', 'true');
-        audioEl.volume = 1.0;
-        // Position off-screen instead of display:none to prevent mobile OS power throttling!
-        audioEl.style.position = 'fixed';
-        audioEl.style.top = '-9999px';
-        audioEl.style.left = '-9999px';
-        audioEl.style.width = '1px';
-        audioEl.style.height = '1px';
-        audioEl.style.opacity = '0.01';
-        audioEl.style.pointerEvents = 'none';
-        document.body.appendChild(audioEl);
-        remoteAudioElementsRef.current.set(targetId, audioEl);
-      }
-
-      const streamToPlay = (event.streams && event.streams[0]) 
-        ? event.streams[0] 
-        : new MediaStream([event.track]);
-
-      audioEl.srcObject = streamToPlay;
-
-      const playPromise = audioEl.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((e) => {
-          console.warn('[WEBRTC] Audio autoplay blocked, waiting for user gesture:', e);
-          const resumeAudio = () => {
-            audioEl?.play().catch(() => {});
-            if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-              audioContextRef.current.resume().catch(() => {});
-            }
-            window.removeEventListener('click', resumeAudio);
-            window.removeEventListener('touchstart', resumeAudio);
-          };
-          window.addEventListener('click', resumeAudio, { once: true });
-          window.addEventListener('touchstart', resumeAudio, { once: true });
-        });
-      }
-
-      // Route stream through Web Audio API for remote speaking detection and fallback playback
-      try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          if (!audioContextRef.current) {
-            audioContextRef.current = new AudioCtx();
-          }
-          const audioCtx = audioContextRef.current;
-          if (audioCtx.state === 'suspended') {
-            audioCtx.resume().catch(() => {});
-          }
-          const remoteSource = audioCtx.createMediaStreamSource(streamToPlay);
-          const remoteAnalyser = audioCtx.createAnalyser();
-          remoteAnalyser.fftSize = 256;
-          remoteSource.connect(remoteAnalyser);
-
-          // Monitor remote partner voice activity (for partner is speaking indicator)
-          const remoteData = new Uint8Array(remoteAnalyser.frequencyBinCount);
-          if (remoteSpeakingIntervalsRef.current.has(targetId)) {
-            clearInterval(remoteSpeakingIntervalsRef.current.get(targetId)!);
-          }
-          const remoteInterval = setInterval(() => {
-            remoteAnalyser.getByteFrequencyData(remoteData);
-            let sum = 0;
-            for (let i = 0; i < remoteData.length; i++) {
-              sum += remoteData[i];
-            }
-            const avg = sum / remoteData.length;
-            const isSpeaking = avg > 14;
-            setRemoteSpeakingPeers(prev => {
-              const has = prev.includes(targetId);
-              if (isSpeaking && !has) return [...prev, targetId];
-              if (!isSpeaking && has) return prev.filter(id => id !== targetId);
-              return prev;
-            });
-          }, 150);
-          remoteSpeakingIntervalsRef.current.set(targetId, remoteInterval);
-        }
-      } catch (err) {
-        console.warn('[WEBRTC] Remote speaking detector unavailable:', err);
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      if (pc!.connectionState === 'failed' || pc!.connectionState === 'disconnected') {
-        if (typeof pc!.restartIce === 'function') {
-          pc!.restartIce();
-        }
-      }
-    };
-
-    return pc;
-  }, [getIceServers]);
-
-  const callPeer = useCallback(async (targetId: string) => {
-    if (!myParticipantId || targetId === myParticipantId) return;
-
-    try {
-      const pc = getOrCreatePeerConnection(targetId);
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: false
-      });
-      const enhancedSdp = enhanceSdpForVoice(offer.sdp || '');
-      const enhancedOffer = new RTCSessionDescription({ type: offer.type, sdp: enhancedSdp });
-      await pc.setLocalDescription(enhancedOffer);
-
-      wsService.sendMessage({
-        type: 'WEBRTC_OFFER',
-        target: targetId,
-        offer: {
-          type: enhancedOffer.type,
-          sdp: enhancedOffer.sdp
-        }
-      });
-    } catch (err) {
-      console.error(`[WEBRTC] Error calling peer ${targetId}:`, err);
-    }
-  }, [myParticipantId, getOrCreatePeerConnection]);
+  }, [attachTrackToPeerConnections, myParticipantId, participantIds, callPeer]);
 
   useEffect(() => {
     const unsubscribe = wsService.addMessageListener(async (msg: ServerMessage) => {
@@ -392,6 +418,23 @@ export function useWebRTCVoice({
           const pc = getOrCreatePeerConnection(from);
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
           await drainIceCandidates(from, pc);
+
+          // If local audio is ready, attach it before creating answer
+          if (localStreamRef.current) {
+            const track = localStreamRef.current.getAudioTracks()[0];
+            if (track) {
+              const sender = pc.getSenders().find(s => !s.track || s.track.kind === 'audio');
+              if (sender) {
+                await sender.replaceTrack(track).catch(() => {});
+              }
+            }
+          }
+
+          // Ensure transceiver direction is sendrecv
+          const transceivers = pc.getTransceivers();
+          transceivers.forEach(t => {
+            t.direction = 'sendrecv';
+          });
 
           const answer = await pc.createAnswer();
           const enhancedSdp = enhanceSdpForVoice(answer.sdp || '');
@@ -516,14 +559,22 @@ export function useWebRTCVoice({
 
     if (!nextMuted) {
       const track = localStreamRef.current.getAudioTracks()[0];
-      if (track) attachTrackToPeerConnections(track);
+      if (track) {
+        attachTrackToPeerConnections(track);
+        // Renegotiate with peers to ensure two-way audio flow
+        participantIds.forEach((targetId) => {
+          if (targetId !== myParticipantId) {
+            callPeer(targetId);
+          }
+        });
+      }
     }
 
     wsService.sendMessage({
       type: 'MUTE_STATUS',
       isMuted: nextMuted
     });
-  }, [isMuted, startAudio, attachTrackToPeerConnections, unlockAudioContext]);
+  }, [isMuted, startAudio, attachTrackToPeerConnections, unlockAudioContext, participantIds, myParticipantId, callPeer]);
 
   useEffect(() => {
     return () => {
@@ -547,6 +598,10 @@ export function useWebRTCVoice({
         }
       });
       remoteAudioElementsRef.current.clear();
+      const container = document.getElementById('cinemate-voice-container');
+      if (container && container.parentNode) {
+        container.parentNode.removeChild(container);
+      }
     };
   }, []);
 

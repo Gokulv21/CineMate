@@ -379,6 +379,17 @@ export class WebSocketHandler {
         }
         const leaveResult = this.roomManager.leaveRoom(session.roomId, session.participantId);
         console.log(`[ROOM] ${session.userName} left room ${session.roomId}. Remaining: ${leaveResult.room?.participants.length ?? 0}`);
+        if (leaveResult.isRoomEmpty) {
+            // Ephemeral Room Cleanup: Zero storage overhead!
+            // Once both users leave, wipe the room from RAM after 60s grace period (for refreshes)
+            setTimeout(() => {
+                const currentRoom = this.roomManager.getRoom(session.roomId);
+                if (currentRoom && currentRoom.participants.length === 0) {
+                    this.roomManager.deleteRoom(session.roomId);
+                    console.log(`[ROOM] Ephemeral cleanup: Room ${session.roomId} completely purged from memory (0 bytes stored).`);
+                }
+            }, 60 * 1000);
+        }
         if (leaveResult.room && !leaveResult.isRoomEmpty) {
             this.broadcastToRoom(session.roomId, {
                 type: 'PARTICIPANT_LEFT',

@@ -283,7 +283,13 @@ export class RoomManager {
     return chatMsg;
   }
 
-  public cleanupStaleRooms(emptyTimeoutMs: number = 30 * 60 * 1000, staleTimeoutMs: number = 2 * 60 * 60 * 1000): number {
+  public deleteRoom(roomId: string): boolean {
+    const normalizedId = roomId.toUpperCase().trim();
+    this.emptySince.delete(normalizedId);
+    return this.rooms.delete(normalizedId);
+  }
+
+  public cleanupStaleRooms(emptyTimeoutMs: number = 2 * 60 * 1000, staleTimeoutMs: number = 30 * 60 * 1000): number {
     const now = Date.now();
     let cleanedCount = 0;
 

@@ -31,13 +31,13 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 const wsHandler = new WebSocketHandler(wss, roomManager);
 
-// Stale room cleanup job every 5 minutes
+// Ephemeral room cleanup job every 1 minute (Zero storage / Auto-purge)
 const cleanupInterval = setInterval(() => {
   const cleaned = roomManager.cleanupStaleRooms();
   if (cleaned > 0) {
     console.log(`[ROOM] Cleaned up ${cleaned} stale/empty room(s).`);
   }
-}, 5 * 60 * 1000);
+}, 1 * 60 * 1000);
 
 // API Endpoints
 app.get('/api/health', (req, res) => {

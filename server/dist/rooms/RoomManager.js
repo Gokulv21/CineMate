@@ -218,7 +218,12 @@ export class RoomManager {
         room.lastActivityAt = Date.now();
         return chatMsg;
     }
-    cleanupStaleRooms(emptyTimeoutMs = 30 * 60 * 1000, staleTimeoutMs = 2 * 60 * 60 * 1000) {
+    deleteRoom(roomId) {
+        const normalizedId = roomId.toUpperCase().trim();
+        this.emptySince.delete(normalizedId);
+        return this.rooms.delete(normalizedId);
+    }
+    cleanupStaleRooms(emptyTimeoutMs = 2 * 60 * 1000, staleTimeoutMs = 30 * 60 * 1000) {
         const now = Date.now();
         let cleanedCount = 0;
         for (const [roomId, emptyTime] of this.emptySince.entries()) {
