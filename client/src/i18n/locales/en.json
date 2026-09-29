@@ -41,14 +41,14 @@
     "reactionsDesc": "Express your emotions in real-time with floating reaction bursts across the screen."
   },
   "createModal": {
-    "title": "Create a Room ❤️",
+    "title": "Create a Room 💚",
     "subtitle": "Host a private movie night for you and your partner",
     "nameLabel": "Your Name",
     "namePlaceholder": "e.g. Gokul",
     "roomNameLabel": "Room Name (Optional)",
-    "roomNamePlaceholder": "e.g. Interstellar Night ❤️",
+    "roomNamePlaceholder": "e.g. Interstellar Night 💚",
     "submitButton": "Create Room",
-    "readyTitle": "Your room is ready ❤️",
+    "readyTitle": "Your room is ready 💚",
     "readySubtitle": "Share the room code or invite link with your partner",
     "roomCodeLabel": "Room Code",
     "copyLink": "Copy Invite Link",
@@ -91,15 +91,27 @@
     "dismissWarning": "Continue anyway",
     "waitingHostPlay": "Waiting for host to press play...",
     "hostOnlyControl": "Playback is controlled by the Host",
-    "finishedTitle": "Movie finished ❤️",
+    "finishedTitle": "Movie finished 💚",
     "replay": "Replay Movie",
-    "chooseAnother": "Choose Another Video"
+    "chooseAnother": "Choose Another Video",
+    "aspectRatio": "Aspect / Fit",
+    "fitContain": "Fit (Contain)",
+    "fitCover": "Fill Screen / Zoom",
+    "fitStretch": "Stretch (100%)",
+    "aspect16_9": "16:9 Widescreen",
+    "aspect21_9": "21:9 Ultrawide Cinema",
+    "aspect4_3": "4:3 Classic",
+    "rotateLandscape": "Rotate Landscape",
+    "rotatePortrait": "Rotate Portrait",
+    "mobileFullView": "Mobile Theater View",
+    "exitFullView": "Exit Theater View",
+    "sendReaction": "Send 💚"
   },
   "chat": {
     "title": "Chat",
     "placeholder": "Type a message...",
     "send": "Send",
-    "empty": "No messages yet. Say something ❤️",
+    "empty": "No messages yet. Say something 💚",
     "you": "You"
   },
   "voice": {
@@ -124,7 +136,7 @@
     "close": "Close"
   },
   "inviteModal": {
-    "title": "Invite to Movie Night ❤️",
+    "title": "Invite to Movie Night 💚",
     "roomCode": "Room Code",
     "inviteLink": "Invite Link",
     "copyLink": "Copy Link",

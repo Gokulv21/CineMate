@@ -47,7 +47,7 @@ export class RoomManager {
 
     const room: Room = {
       id: roomId,
-      name: customRoomName?.trim().slice(0, 50) || 'Movie Night ❤️',
+      name: customRoomName?.trim().slice(0, 50) || 'Movie Night 💚',
       hostId: hostId,
       createdAt: now,
       lastActivityAt: now,

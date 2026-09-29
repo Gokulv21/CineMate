@@ -41,14 +41,14 @@
     "reactionsDesc": "திரையில் மிதக்கும் எமோஜிகள் மூலம் உங்கள் உணர்வுகளை வெளிப்படுத்துங்கள்."
   },
   "createModal": {
-    "title": "Room உருவாக்கு ❤️",
+    "title": "Room உருவாக்கு 💚",
     "subtitle": "உங்களுக்காகவும் உங்கள் இணைக்காகவும் ஒரு சினிமா அரங்கம்",
     "nameLabel": "உங்கள் பெயர்",
     "namePlaceholder": "எ.கா: கோகுல்",
     "roomNameLabel": "Room பெயர் (விருப்பம்)",
-    "roomNamePlaceholder": "எ.கா: Movie Night ❤️",
+    "roomNamePlaceholder": "எ.கா: Movie Night 💚",
     "submitButton": "Room உருவாக்கு",
-    "readyTitle": "உங்கள் Room தயாராக உள்ளது ❤️",
+    "readyTitle": "உங்கள் Room தயாராக உள்ளது 💚",
     "readySubtitle": "Room குறியீட்டை அல்லது இணைப்பை உங்கள் இணையுடன் பகிரவும்",
     "roomCodeLabel": "Room குறியீடு",
     "copyLink": "இணைப்பை நகலெடு",
@@ -91,15 +91,27 @@
     "dismissWarning": "இருப்பினும் தொடரவும்",
     "waitingHostPlay": "ஹோஸ்ட் இயக்குவதற்காக காத்திருக்கிறது...",
     "hostOnlyControl": "ஹோஸ்ட் மட்டுமே இயக்க முடியும்",
-    "finishedTitle": "திரைப்படம் முடிந்தது ❤️",
+    "finishedTitle": "திரைப்படம் முடிந்தது 💚",
     "replay": "மீண்டும் இயக்கு",
-    "chooseAnother": "வேறு படம் தேர்வு செய்"
+    "chooseAnother": "வேறு படம் தேர்வு செய்",
+    "aspectRatio": "விகிதம் & பொருத்தம்",
+    "fitContain": "அளவுக்குள் (Fit)",
+    "fitCover": "முழுத் திரை (Zoom/Cover)",
+    "fitStretch": "நீட்டு (Stretch)",
+    "aspect16_9": "16:9 அகலத்திரை",
+    "aspect21_9": "21:9 சினிமா முறை",
+    "aspect4_3": "4:3 கிளாசிக்",
+    "rotateLandscape": "கிடைமட்டமாக சுழற்று",
+    "rotatePortrait": "செங்குத்தாக சுழற்று",
+    "mobileFullView": "மொபைல் முழுத்திரை",
+    "exitFullView": "முழுத்திரையிலிருந்து வெளியேறு",
+    "sendReaction": "💚 அனுப்பு"
   },
   "chat": {
     "title": "அரட்டை",
     "placeholder": "செய்தி தட்டச்சு செய்யவும்...",
     "send": "அனுப்பு",
-    "empty": "இன்னும் செய்திகள் இல்லை. பேச தொடங்குங்கள் ❤️",
+    "empty": "இன்னும் செய்திகள் இல்லை. பேச தொடங்குங்கள் 💚",
     "you": "நீங்கள்"
   },
   "voice": {
@@ -124,7 +136,7 @@
     "close": "மூடு"
   },
   "inviteModal": {
-    "title": "சினிமா இரவுக்கு அழைக்கவும் ❤️",
+    "title": "சினிமா இரவுக்கு அழைக்கவும் 💚",
     "roomCode": "Room குறியீடு",
     "inviteLink": "அழைப்பு இணைப்பு",
     "copyLink": "இணைப்பை நகலெடு",

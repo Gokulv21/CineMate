@@ -41,14 +41,14 @@
     "reactionsDesc": "感動や笑いの瞬間を、画面に舞うスタンプで共有できます。"
   },
   "createModal": {
-    "title": "ルームを作成 ❤️",
+    "title": "ルームを作成 💚",
     "subtitle": "大切な人と過ごすプライベートな映画時間",
     "nameLabel": "あなたのお名前",
     "namePlaceholder": "例: たろう",
     "roomNameLabel": "ルーム名 (任意)",
-    "roomNamePlaceholder": "例: 今夜の映画会 ❤️",
+    "roomNamePlaceholder": "例: 今夜の映画会 💚",
     "submitButton": "ルームを作成",
-    "readyTitle": "ルームの準備ができました ❤️",
+    "readyTitle": "ルームの準備ができました 💚",
     "readySubtitle": "ルームコードまたは招待リンクをお相手に共有してください",
     "roomCodeLabel": "ルームコード",
     "copyLink": "招待リンクをコピー",
@@ -91,15 +91,27 @@
     "dismissWarning": "そのまま続ける",
     "waitingHostPlay": "ホストが再生を開始するのを待っています...",
     "hostOnlyControl": "再生操作はホストのみ可能です",
-    "finishedTitle": "映画が終わりました ❤️",
+    "finishedTitle": "映画が終わりました 💚",
     "replay": "もう一度観る",
-    "chooseAnother": "別の映画を選ぶ"
+    "chooseAnother": "別の映画を選ぶ",
+    "aspectRatio": "画面比率・フィット",
+    "fitContain": "画面に収める (Fit)",
+    "fitCover": "全画面拡大 (Zoom/Cover)",
+    "fitStretch": "引き伸ばし (Stretch)",
+    "aspect16_9": "16:9 ワイド画面",
+    "aspect21_9": "21:9 シネマスコープ",
+    "aspect4_3": "4:3 スタンダード",
+    "rotateLandscape": "横画面に回転",
+    "rotatePortrait": "縦画面に回転",
+    "mobileFullView": "モバイルシアター表示",
+    "exitFullView": "シアター表示を終了",
+    "sendReaction": "💚 を送る"
   },
   "chat": {
     "title": "チャット",
     "placeholder": "メッセージを入力...",
     "send": "送信",
-    "empty": "まだメッセージはありません。声をかけてみましょう ❤️",
+    "empty": "まだメッセージはありません。声をかけてみましょう 💚",
     "you": "あなた"
   },
   "voice": {
@@ -124,7 +136,7 @@
     "close": "閉じる"
   },
   "inviteModal": {
-    "title": "映画鑑賞に招待 ❤️",
+    "title": "映画鑑賞に招待 💚",
     "roomCode": "ルームコード",
     "inviteLink": "招待リンク",
     "copyLink": "リンクをコピー",

@@ -13,7 +13,10 @@ const __dirname = path.dirname(__filename);
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const CLIENT_URL = process.env.CLIENT_URL || '*';
 const app = express();
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
+app.use(cors({
+    origin: CLIENT_URL === '*' ? true : CLIENT_URL,
+    credentials: true
+}));
 app.use(express.json());
 const roomManager = new RoomManager();
 // Create HTTP server & attach WebSocket

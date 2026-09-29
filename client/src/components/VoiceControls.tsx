@@ -28,7 +28,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
     <div className="bg-zinc-950/80 rounded-2xl border border-zinc-800/80 p-3.5 shadow-xl flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Radio className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+          <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
           <h3 className="text-xs font-bold text-white tracking-wide uppercase">
             {t('voice.title')}
           </h3>
@@ -48,7 +48,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
           ) : (
             <button
               onClick={onRetryVoice}
-              className="text-zinc-500 hover:text-rose-400 underline transition-colors"
+              className="text-zinc-500 hover:text-emerald-400 underline transition-colors"
             >
               {t('voice.unavailable')}
             </button>
@@ -74,7 +74,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
                       isSpeaking
                         ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-zinc-950 bg-emerald-500/20 text-emerald-300'
                         : isMe
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                         : 'bg-zinc-800 text-zinc-300 border border-zinc-700'
                     }`}
                   >
@@ -91,7 +91,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
                     {p.name} {isMe && `(${t('chat.you')})`}
                   </span>
                   {p.isHost && (
-                    <span className="shrink-0 text-[9px] font-bold tracking-wider px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-0.5">
+                    <span className="shrink-0 text-[9px] font-bold tracking-wider px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-0.5">
                       <Crown className="w-2.5 h-2.5" />
                       HOST
                     </span>
@@ -108,9 +108,9 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
                 )}
 
                 {userMuted ? (
-                  <MicOff className="w-3.5 h-3.5 text-rose-400/80" />
+                  <MicOff className="w-3.5 h-3.5 text-zinc-500" />
                 ) : (
-                  <Mic className="w-3.5 h-3.5 text-zinc-400" />
+                  <Mic className="w-3.5 h-3.5 text-emerald-400" />
                 )}
               </div>
             </div>
@@ -129,7 +129,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
       >
         {isMuted ? (
           <>
-            <MicOff className="w-4 h-4 text-rose-400" />
+            <MicOff className="w-4 h-4 text-zinc-400" />
             <span>{t('voice.unmute')}</span>
           </>
         ) : (

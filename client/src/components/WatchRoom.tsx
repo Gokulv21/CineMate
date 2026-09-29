@@ -7,7 +7,9 @@ import {
   Share2, 
   LogOut, 
   Radio, 
-  MessageSquare
+  MessageSquare,
+  Copy,
+  Check
 } from 'lucide-react';
 import type { 
   Room, 
@@ -55,6 +57,17 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<'chat' | 'voice'>('chat');
   const [partnerMetadata, setPartnerMetadata] = useState<VideoMetadata | undefined>(undefined);
+  const [copiedId, setCopiedId] = useState(false);
+
+  const handleCopyRoomId = async () => {
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy room id:', err);
+    }
+  };
 
   useEffect(() => {
     wsService.connect(roomId, userName);
@@ -248,45 +261,64 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
   const participantCount = room?.participants.length || 1;
 
   return (
-    <div className="flex flex-col h-screen max-h-screen bg-[#07080b] text-zinc-100 overflow-hidden">
+    <div className="flex flex-col h-screen max-h-screen bg-[#06120e] text-zinc-100 overflow-hidden">
       {/* Header */}
-      <header className="h-14 cinema-surface border-b border-zinc-800/80 px-4 sm:px-6 flex items-center justify-between shrink-0 z-40">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={handleLeaveConfirm}>
-            <div className="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center">
-              <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
+      <header className="h-14 cinema-surface border-b border-emerald-950/60 px-2.5 sm:px-6 flex items-center justify-between shrink-0 z-40">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={handleLeaveConfirm}>
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+              <Heart className="w-4 h-4 text-emerald-400 fill-emerald-400" />
             </div>
-            <span className="font-bold text-sm tracking-tight hidden sm:inline text-white">
+            <span className="font-bold text-sm tracking-tight hidden md:inline text-white">
               CineMate
             </span>
           </div>
 
-          <span className="text-zinc-600 hidden sm:inline">•</span>
+          <span className="text-zinc-600 hidden md:inline">•</span>
 
-          <div className="flex items-center gap-2">
-            <h2 className="text-xs sm:text-sm font-semibold text-zinc-200 truncate max-w-[140px] sm:max-w-xs">
-              {room?.name || 'Movie Night ❤️'}
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <h2 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate max-w-[90px] xs:max-w-[130px] sm:max-w-xs">
+              {room?.name || 'Movie Night 💚'}
             </h2>
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-rose-400">
-              {roomId}
-            </span>
+            <button
+              type="button"
+              onClick={handleCopyRoomId}
+              className="inline-flex items-center justify-center gap-1 h-7 px-2 rounded-md bg-zinc-900/90 border border-emerald-900/40 hover:border-emerald-500/50 text-[11px] font-mono font-bold text-emerald-400 hover:text-emerald-300 transition-colors shrink-0 cursor-pointer active:scale-95"
+              title="Click to copy Room Code"
+            >
+              <span>{roomId}</span>
+              {copiedId ? (
+                <Check className="w-3 h-3 text-emerald-400" />
+              ) : (
+                <Copy className="w-3 h-3 text-zinc-500" />
+              )}
+            </button>
           </div>
         </div>
 
         {/* Right Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Connection Status Badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900/90 border border-zinc-800 text-[10px]">
+          <div 
+            className="inline-flex items-center justify-center h-8 px-2 sm:px-2.5 rounded-lg bg-zinc-900/90 border border-emerald-900/30 text-[11px] font-medium text-zinc-300"
+            title={
+              connectionStatus === 'CONNECTED'
+                ? t('room.connected')
+                : connectionStatus === 'CONNECTING'
+                ? t('room.connecting')
+                : t('room.disconnected')
+            }
+          >
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 rounded-full shrink-0 ${
                 connectionStatus === 'CONNECTED'
-                  ? 'bg-emerald-400'
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
                   : connectionStatus === 'CONNECTING'
                   ? 'bg-amber-400 animate-pulse'
                   : 'bg-rose-500'
               }`}
             />
-            <span className="text-zinc-300 font-medium hidden md:inline">
+            <span className="ml-1.5 hidden md:inline">
               {connectionStatus === 'CONNECTED'
                 ? t('room.connected')
                 : connectionStatus === 'CONNECTING'
@@ -296,45 +328,46 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           </div>
 
           {/* Online count */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900/90 border border-zinc-800 text-[10px] text-zinc-300">
-            <Users className="w-3 h-3 text-rose-400" />
-            <span>{participantCount} {t('room.online')}</span>
+          <div className="inline-flex items-center justify-center gap-1.5 h-8 px-2 sm:px-2.5 rounded-lg bg-zinc-900/90 border border-emerald-900/30 text-[11px] font-medium text-zinc-300">
+            <Users className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span>{participantCount}</span>
+            <span className="hidden sm:inline">{t('room.online')}</span>
           </div>
 
           {/* Invite Button */}
           <button
             type="button"
             onClick={() => setIsInviteOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-200 border border-zinc-800 hover:border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow-md shadow-emerald-950/40 active:scale-95 transition-all cursor-pointer"
           >
-            <Share2 className="w-3.5 h-3.5 text-rose-400" />
-            <span className="hidden sm:inline">{t('room.invite')}</span>
+            <Share2 className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden xs:inline">{t('room.invite')}</span>
           </button>
 
           {/* Settings Button */}
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 hover:border-emerald-800/40 transition-colors cursor-pointer"
             aria-label={t('room.settings')}
           >
-            <SettingsIcon className="w-4 h-4" />
+            <SettingsIcon className="w-4 h-4 shrink-0" />
           </button>
 
           {/* Leave Button */}
           <button
             type="button"
             onClick={handleLeaveConfirm}
-            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-rose-950/40 text-zinc-400 hover:text-rose-400 border border-zinc-800 hover:border-rose-900/50 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/90 hover:bg-rose-950/40 text-zinc-400 hover:text-rose-400 border border-zinc-800 hover:border-rose-900/50 transition-colors cursor-pointer"
             title={t('room.leave')}
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 shrink-0" />
           </button>
         </div>
       </header>
 
       {/* Main Watch Area */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden p-3 sm:p-4 gap-4">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2.5 sm:p-4 gap-3 sm:gap-4">
         {/* Left Column: Video Viewport & Floating Reactions */}
         <div className="flex-1 flex flex-col min-w-0 h-full relative">
           <div className="relative flex-1 flex items-center justify-center min-h-0">
@@ -351,17 +384,19 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
               onSeek={triggerSeek}
               onReplay={triggerReplay}
               videoEventHandlers={eventHandlers}
+              onSendReaction={handleSendReaction}
+              reactionsEnabled={room?.settings.reactionsEnabled ?? true}
             />
           </div>
 
           {/* Mobile Tab Selector */}
-          <div className="flex lg:hidden mt-3 border-b border-zinc-800 shrink-0">
+          <div className="flex lg:hidden mt-2.5 border-b border-zinc-800/80 shrink-0">
             <button
               onClick={() => setMobileTab('chat')}
               className={`flex-1 py-2 text-xs font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
                 mobileTab === 'chat'
-                  ? 'border-rose-500 text-rose-400'
-                  : 'border-transparent text-zinc-400'
+                  ? 'border-emerald-500 text-emerald-400'
+                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
@@ -371,8 +406,8 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
               onClick={() => setMobileTab('voice')}
               className={`flex-1 py-2 text-xs font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
                 mobileTab === 'voice'
-                  ? 'border-rose-500 text-rose-400'
-                  : 'border-transparent text-zinc-400'
+                  ? 'border-emerald-500 text-emerald-400'
+                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
               }`}
             >
               <Radio className="w-3.5 h-3.5" />
@@ -381,7 +416,7 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           </div>
 
           {/* Mobile Bottom Sheet/Panel */}
-          <div className="lg:hidden flex-1 min-h-[220px] max-h-[300px] mt-2 overflow-hidden">
+          <div className="lg:hidden flex-1 min-h-[200px] max-h-[280px] mt-2 overflow-hidden">
             {mobileTab === 'chat' ? (
               <ChatPanel
                 messages={messages}

@@ -56,8 +56,8 @@ export const InviteModal: React.FC<InviteModalProps> = ({
         </button>
 
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-            <Heart className="w-5 h-5 text-rose-500 fill-rose-500" />
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+            <Heart className="w-5 h-5 text-emerald-500 fill-emerald-500" />
           </div>
           <div>
             <h3 className="text-xl font-bold text-white tracking-tight">
@@ -74,7 +74,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
             <span className="text-[10px] uppercase font-semibold tracking-wider text-zinc-500">
               {t('inviteModal.roomCode')}
             </span>
-            <p className="text-2xl font-mono font-bold tracking-widest text-rose-400">
+            <p className="text-2xl font-mono font-bold tracking-widest text-emerald-400">
               {roomId}
             </p>
           </div>
@@ -107,7 +107,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
           <button
             type="button"
             onClick={handleCopyLink}
-            className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all cursor-pointer"
+            className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
           >
             {copiedLink ? (
               <>

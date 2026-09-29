@@ -38,8 +38,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </button>
 
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-            <Sliders className="w-5 h-5 text-rose-400" />
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+            <Sliders className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
             <h3 className="text-lg font-bold text-white tracking-tight">
@@ -65,7 +65,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClick={() => onUpdateSettings({ playbackControl: 'HOST_ONLY' })}
                 className={`py-2 px-3 rounded-lg text-xs font-medium border text-center transition-all ${
                   settings.playbackControl === 'HOST_ONLY'
-                    ? 'bg-rose-500/15 border-rose-500/60 text-rose-300'
+                    ? 'bg-emerald-500/15 border-emerald-500/60 text-emerald-300'
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                 } ${!isHost && 'opacity-60 cursor-not-allowed'}`}
               >
@@ -77,7 +77,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClick={() => onUpdateSettings({ playbackControl: 'EVERYONE' })}
                 className={`py-2 px-3 rounded-lg text-xs font-medium border text-center transition-all ${
                   settings.playbackControl === 'EVERYONE'
-                    ? 'bg-rose-500/15 border-rose-500/60 text-rose-300'
+                    ? 'bg-emerald-500/15 border-emerald-500/60 text-emerald-300'
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                 } ${!isHost && 'opacity-60 cursor-not-allowed'}`}
               >
@@ -88,7 +88,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
             <div className="flex items-center gap-2.5">
-              <Zap className="w-4 h-4 text-rose-400" />
+              <Zap className="w-4 h-4 text-emerald-400" />
               <div>
                 <p className="text-xs font-semibold text-zinc-200">{t('settings.autoSync')}</p>
                 <p className="text-[10px] text-zinc-500">Auto speed & seek alignment</p>
@@ -99,7 +99,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               disabled={!isHost}
               checked={settings.autoSync}
               onChange={(e) => onUpdateSettings({ autoSync: e.target.checked })}
-              className="w-4 h-4 accent-rose-600 rounded cursor-pointer disabled:cursor-not-allowed"
+              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer disabled:cursor-not-allowed"
             />
           </div>
 
@@ -113,7 +113,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               disabled={!isHost}
               checked={settings.voiceChat}
               onChange={(e) => onUpdateSettings({ voiceChat: e.target.checked })}
-              className="w-4 h-4 accent-rose-600 rounded cursor-pointer disabled:cursor-not-allowed"
+              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer disabled:cursor-not-allowed"
             />
           </div>
 
@@ -127,7 +127,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               disabled={!isHost}
               checked={settings.chatEnabled}
               onChange={(e) => onUpdateSettings({ chatEnabled: e.target.checked })}
-              className="w-4 h-4 accent-rose-600 rounded cursor-pointer disabled:cursor-not-allowed"
+              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer disabled:cursor-not-allowed"
             />
           </div>
 
@@ -141,7 +141,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               disabled={!isHost}
               checked={settings.reactionsEnabled}
               onChange={(e) => onUpdateSettings({ reactionsEnabled: e.target.checked })}
-              className="w-4 h-4 accent-rose-600 rounded cursor-pointer disabled:cursor-not-allowed"
+              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer disabled:cursor-not-allowed"
             />
           </div>
 

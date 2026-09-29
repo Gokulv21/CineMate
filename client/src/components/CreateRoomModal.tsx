@@ -101,7 +101,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
     >
       <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-7 shadow-2xl overflow-hidden">
         {/* Subtle decorative glow */}
-        <div className="absolute -top-16 -right-16 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -top-16 -right-16 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
         {/* Close Button */}
         <button
@@ -115,8 +115,8 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
         {!createdRoomId ? (
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-                <Heart className="w-5 h-5 text-rose-500 fill-rose-500" />
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                <Heart className="w-5 h-5 text-emerald-500 fill-emerald-500" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white tracking-tight">
@@ -129,7 +129,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
             </div>
 
             {error && (
-              <div className="mt-3 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
+              <div className="mt-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
                 {error}
               </div>
             )}
@@ -137,7 +137,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
             <form onSubmit={handleCreate} className="mt-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
-                  {t('createModal.nameLabel')} <span className="text-rose-500">*</span>
+                  {t('createModal.nameLabel')} <span className="text-emerald-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -146,7 +146,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                   onChange={(e) => setUserName(e.target.value)}
                   placeholder={t('createModal.namePlaceholder')}
                   maxLength={30}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/80 border border-zinc-700/80 text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/80 border border-zinc-700/80 text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
                   autoFocus
                 />
               </div>
@@ -161,7 +161,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                   onChange={(e) => setRoomName(e.target.value)}
                   placeholder={t('createModal.roomNamePlaceholder')}
                   maxLength={50}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/80 border border-zinc-700/80 text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/80 border border-zinc-700/80 text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
                 />
               </div>
 
@@ -169,7 +169,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                 <button
                   type="submit"
                   disabled={isLoading || !userName.trim()}
-                  className="w-full py-3 rounded-xl font-semibold text-sm text-white bg-rose-600 hover:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-rose-600/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-xl font-semibold text-sm text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-600/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <>
@@ -189,8 +189,8 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
         ) : (
           <div>
             <div className="text-center py-2">
-              <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mb-3">
-                <Heart className="w-6 h-6 text-rose-500 fill-rose-500" />
+              <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-3">
+                <Heart className="w-6 h-6 text-emerald-500 fill-emerald-500" />
               </div>
               <h3 className="text-xl font-bold text-white tracking-tight">
                 {t('createModal.readyTitle')}
@@ -206,7 +206,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                 <span className="text-[10px] uppercase font-semibold tracking-wider text-zinc-400">
                   {t('createModal.roomCodeLabel')}
                 </span>
-                <p className="text-2xl font-mono font-bold tracking-widest text-rose-400">
+                <p className="text-2xl font-mono font-bold tracking-widest text-emerald-400">
                   {createdRoomId}
                 </p>
               </div>
@@ -252,7 +252,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
             <button
               type="button"
               onClick={handleEnterRoom}
-              className="mt-4 w-full py-3 rounded-xl font-semibold text-sm text-white bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+              className="mt-4 w-full py-3 rounded-xl font-semibold text-sm text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
             >
               <Film className="w-4 h-4" />
               <span>{t('createModal.enterRoom')}</span>
