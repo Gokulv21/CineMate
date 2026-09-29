@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Copy, Check, ArrowRight, Film, Heart, Loader2 } from 'lucide-react';
+import { API_BASE_URL } from '../config/api.js';
 
 interface CreateRoomModalProps {
   isOpen: boolean;
@@ -32,7 +33,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
     setError(null);
 
     try {
-      const response = await fetch('/api/rooms', {
+      const response = await fetch(`${API_BASE_URL}/api/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

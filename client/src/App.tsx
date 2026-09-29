@@ -6,6 +6,8 @@ import { CreateRoomModal } from './components/CreateRoomModal.js';
 import { JoinRoomModal } from './components/JoinRoomModal.js';
 import { WatchRoom } from './components/WatchRoom.js';
 
+import { API_BASE_URL } from './config/api.js';
+
 interface ActiveRoomSession {
   roomId: string;
   userName: string;
@@ -16,6 +18,11 @@ export const App: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
   const [inviteRoomCode, setInviteRoomCode] = useState<string>('');
+
+  // Pre-warm backend Render server on app load to minimize cold-start latency
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/health`).catch(() => {});
+  }, []);
 
   // Check URL query parameters for ?room=CODE
   useEffect(() => {

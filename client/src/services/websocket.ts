@@ -3,6 +3,8 @@ import type { ClientMessage, ServerMessage, ConnectionStatus } from '../types/in
 export type MessageListener = (msg: ServerMessage) => void;
 export type StatusListener = (status: ConnectionStatus) => void;
 
+import { WS_BASE_URL } from '../config/api.js';
+
 class RoomWebSocketService {
   private ws: WebSocket | null = null;
   private messageListeners: Set<MessageListener> = new Set();
@@ -18,12 +20,7 @@ class RoomWebSocketService {
   public status: ConnectionStatus = 'DISCONNECTED';
 
   private getWsUrl(): string {
-    if (import.meta.env.VITE_WS_URL) {
-      return import.meta.env.VITE_WS_URL;
-    }
-    const isHttps = window.location.protocol === 'https:';
-    const protocol = isHttps ? 'wss:' : 'ws:';
-    return `${protocol}//${window.location.host}/ws`;
+    return WS_BASE_URL;
   }
 
   public connect(roomId: string, userName: string) {

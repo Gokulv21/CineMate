@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, LogIn, Loader2, AlertCircle } from 'lucide-react';
+import { API_BASE_URL } from '../config/api.js';
 
 interface JoinRoomModalProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
 
     try {
       // Validate that room exists
-      const response = await fetch(`/api/rooms/${cleanCode}`);
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${cleanCode}`);
       if (!response.ok) {
         if (response.status === 404) {
           setError(t('joinModal.notFound'));
