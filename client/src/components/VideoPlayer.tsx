@@ -21,10 +21,18 @@ import {
   ArrowLeft,
   Captions,
   Languages,
-  Plus
+  Plus,
+  MessageSquare,
+  Send,
+  X,
+  Sun,
+  Mic,
+  MicOff,
+  Headphones
 } from 'lucide-react';
-import type { VideoMetadata } from '../types/index.js';
+import type { VideoMetadata, ChatMessage, FloatingReaction } from '../types/index.js';
 import { formatTime } from '../lib/utils.js';
+import { ReactionOverlay } from './ReactionOverlay.js';
 
 export type VideoFitMode = 'contain' | 'cover' | 'fill' | '16-9' | '21-9' | '4-3';
 
@@ -41,6 +49,16 @@ interface VideoPlayerProps {
   onVideoEnded?: () => void;
   onSendReaction?: (emoji: string) => void;
   reactionsEnabled?: boolean;
+  reactions?: FloatingReaction[];
+  messages?: ChatMessage[];
+  currentParticipantId?: string;
+  onSendMessage?: (text: string) => void;
+  voiceEnabled?: boolean;
+  isVoiceMuted?: boolean;
+  onToggleVoiceMute?: () => void;
+  isSpeakingLocally?: boolean;
+  partnerIsSpeaking?: boolean;
+  partnerName?: string;
   videoEventHandlers: {
     onPlay: () => void;
     onPause: () => void;
@@ -61,6 +79,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onVideoEnded,
   onSendReaction,
   reactionsEnabled = true,
+  reactions = [],
+  messages = [],
+  currentParticipantId = '',
+  onSendMessage,
+  voiceEnabled = false,
+  isVoiceMuted = true,
+  onToggleVoiceMute,
+  isSpeakingLocally = false,
+  partnerIsSpeaking = false,
+  partnerName = '',
   videoEventHandlers
 }) => {
   const { t } = useTranslation();
@@ -93,8 +121,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Press-and-hold for 2x speed state
   const [isPressAndHold2x, setIsPressAndHold2x] = useState<boolean>(false);
-  // Rotated Landscape state (manual toggle or when in fullscreen on mobile)
+  // Rotated Landscape state (automatic on mobile when entering fullscreen)
   const [isRotatedLandscape, setIsRotatedLandscape] = useState<boolean>(false);
+
+  // VLC / MX Player Screen Brightness (1.0 = 100%, 0.3 - 1.6)
+  const [brightness, setBrightness] = useState<number>(1.0);
+
+  // MX Player Style Gesture Feedback HUD pill
+  const [gestureFeedback, setGestureFeedback] = useState<{
+    type: 'seek' | 'volume' | 'brightness' | 'back' | null;
+    valueText: string;
+    subText?: string;
+    percent?: number;
+  }>({ type: null, valueText: '' });
+  const gestureFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // In-Player Live Chat Drawer & Floating Message Toasts
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
+  const [inPlayerMessageText, setInPlayerMessageText] = useState<string>('');
+  const [floatingMessages, setFloatingMessages] = useState<{ id: string; senderName: string; message: string; timestamp: number }[]>([]);
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
+  const chatDrawerEndRef = useRef<HTMLDivElement>(null);
+  const [showQuickReactions, setShowQuickReactions] = useState<boolean>(false);
 
   // Loading, Buffering & Error states for large movie files
   const [isLoadingVideo, setIsLoadingVideo] = useState<boolean>(false);
@@ -509,12 +557,79 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     resetControlsTimeout();
   };
 
-  // Fullscreen toggle with orientation lock
+  // Auto-route audio to newly connected Bluetooth earpods or headphones mid-playback
+  useEffect(() => {
+    const handleDeviceChange = async () => {
+      console.log('[VideoPlayer] Audio device change detected: re-routing to active earpods/output device');
+      try {
+        if (videoRef.current && 'setSinkId' in videoRef.current) {
+          await (videoRef.current as any).setSinkId('');
+        }
+        if (externalAudioRef.current && 'setSinkId' in externalAudioRef.current) {
+          await (externalAudioRef.current as any).setSinkId('');
+        }
+      } catch (err) {
+        console.warn('[VideoPlayer] Error updating sinkId on device change:', err);
+      }
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+      return () => {
+        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+      };
+    }
+  }, [videoRef]);
+
+  // Floating messages for landscape/fullscreen view:
+  // Whenever new messages arrive from partner, show cute floating toast on top-right of player
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+
+    // First mount: mark all existing messages as seen
+    if (seenMessageIdsRef.current.size === 0) {
+      messages.forEach(m => seenMessageIdsRef.current.add(m.id));
+      return;
+    }
+
+    const newMsgs = messages.filter(m => !seenMessageIdsRef.current.has(m.id) && m.type !== 'SYSTEM');
+    if (newMsgs.length === 0) return;
+
+    newMsgs.forEach(m => {
+      seenMessageIdsRef.current.add(m.id);
+      const toast = {
+        id: m.id,
+        senderName: m.senderName,
+        message: m.message,
+        timestamp: m.timestamp
+      };
+      setFloatingMessages(prev => [...prev.slice(-2), toast]);
+
+      // Auto dismiss after 4.5s
+      setTimeout(() => {
+        setFloatingMessages(prev => prev.filter(t => t.id !== toast.id));
+      }, 4500);
+    });
+  }, [messages]);
+
+  // Auto-scroll chat drawer when new messages arrive
+  useEffect(() => {
+    if (isChatOpen) {
+      chatDrawerEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isChatOpen]);
+
+  // Unified Fullscreen toggle:
+  // On Mobile: Automatically enters fullscreen & locks/rotates into Landscape mode
+  // On Laptop/Desktop: Standard fullscreen without rotating
   const toggleFullscreen = async () => {
     if (!containerRef.current) return;
 
-    if (!isFullscreen) {
-      // 1. Attempt native Fullscreen
+    if (!isFullscreen && !isRotatedLandscape) {
+      const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || 
+        (window.matchMedia && window.matchMedia('(max-width: 1024px) and (hover: none)').matches) ||
+        (window.innerHeight > window.innerWidth);
+
       const el = containerRef.current;
       if (el.requestFullscreen) {
         try {
@@ -534,36 +649,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       setIsFullscreen(true);
 
-      // On mobile portrait screen (height > width), automatically rotate to landscape!
-      if (window.innerHeight > window.innerWidth) {
-        setIsRotatedLandscape(true);
-      }
-
-      // 2. Lock screen orientation to landscape if supported
-      try {
-        if (screen.orientation && 'lock' in screen.orientation) {
-          await (screen.orientation as any).lock('landscape').catch(() => {});
-        } else if ((screen as any).lockOrientation) {
-          (screen as any).lockOrientation('landscape');
+      // On mobile devices, lock screen orientation to landscape
+      if (isMobileDevice) {
+        let nativeLocked = false;
+        try {
+          if (screen.orientation && 'lock' in screen.orientation) {
+            await (screen.orientation as any).lock('landscape').catch(() => {});
+            nativeLocked = true;
+          } else if ((screen as any).lockOrientation) {
+            nativeLocked = !!(screen as any).lockOrientation('landscape');
+          }
+        } catch (err) {
+          console.warn('Screen orientation lock failed:', err);
         }
-      } catch (err) {
-        console.warn('Screen orientation lock failed:', err);
+
+        // If native orientation lock wasn't supported/failed or device is still in portrait,
+        // rotate into landscape via CSS so mobile user ALWAYS gets full landscape movie!
+        if (!nativeLocked || window.innerHeight > window.innerWidth) {
+          setIsRotatedLandscape(true);
+        }
       }
     } else {
       await handleExitFullscreen();
-    }
-    resetControlsTimeout();
-  };
-
-  // Toggle Rotated Landscape directly (VLC / MX player style)
-  const toggleRotateLandscape = () => {
-    if (!isFullscreen && !isRotatedLandscape) {
-      setIsFullscreen(true);
-      setIsRotatedLandscape(true);
-    } else if (isRotatedLandscape) {
-      setIsRotatedLandscape(false);
-    } else {
-      setIsRotatedLandscape(true);
     }
     resetControlsTimeout();
   };
@@ -646,22 +753,279 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   // =========================================================================
-  // GESTURE HANDLING: Single Click (Toggle HUD), Double Click (Skip 10s),
-  // and Press & Hold (2x Speed Stream like YouTube / MX Player)
+  // VLC / MX PLAYER GESTURES:
+  // - Horizontal Swipe: Seek Forward / Backward
+  // - Vertical Swipe (Right Half): Volume Up / Down
+  // - Vertical Swipe (Left Half): Brightness Up / Down
+  // - Left Edge Swipe: Back / Exit Fullscreen
+  // - Single Tap: Toggle HUD Controls
+  // - Double Tap: Quick Skip 10s
+  // - Long Press: 2x Speed
+  // Coordinates are mathematically transformed when rotated to landscape!
   // =========================================================================
 
+  const touchTrackingRef = useRef<{
+    isTracking: boolean;
+    type: 'none' | 'seeking' | 'volume' | 'brightness' | 'backSwipe';
+    startX: number;
+    startY: number;
+    initialTime: number;
+    initialVolume: number;
+    initialBrightness: number;
+    targetTime: number;
+    width: number;
+    height: number;
+    wasLeftEdge: boolean;
+  }>({
+    isTracking: false,
+    type: 'none',
+    startX: 0,
+    startY: 0,
+    initialTime: 0,
+    initialVolume: 1,
+    initialBrightness: 1,
+    targetTime: 0,
+    width: 0,
+    height: 0,
+    wasLeftEdge: false
+  });
+
+  const getVisualTouchCoords = (touch: React.Touch | Touch, rect: DOMRect) => {
+    if (isRotatedLandscape) {
+      // 90deg clockwise CSS rotation:
+      // Visual X = distance from container top downwards: touch.clientY - rect.top
+      // Visual Y = distance from container right leftwards: rect.right - touch.clientX
+      return {
+        x: touch.clientY - rect.top,
+        y: rect.right - touch.clientX,
+        width: rect.height,
+        height: rect.width
+      };
+    } else {
+      return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+        width: rect.width,
+        height: rect.height
+      };
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) return;
+    if ((e.target as HTMLElement).closest('button, input, select, a, [data-interactive="true"]')) {
+      return;
+    }
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const coords = getVisualTouchCoords(e.touches[0], rect);
+    pointerStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    wasLongPressRef.current = false;
+    controlsOpenAtTouchRef.current = showControls;
+
+    const isLeftEdge = coords.x < Math.min(65, coords.width * 0.12);
+
+    touchTrackingRef.current = {
+      isTracking: true,
+      type: 'none',
+      startX: coords.x,
+      startY: coords.y,
+      initialTime: currentTime,
+      initialVolume: volume,
+      initialBrightness: brightness,
+      targetTime: currentTime,
+      width: coords.width,
+      height: coords.height,
+      wasLeftEdge: isLeftEdge
+    };
+
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    if (!isLeftEdge) {
+      longPressTimerRef.current = setTimeout(() => {
+        if (videoRef.current && isPlaying && touchTrackingRef.current.type === 'none') {
+          wasLongPressRef.current = true;
+          setIsPressAndHold2x(true);
+          videoRef.current.playbackRate = 2.0;
+          if (externalAudioRef.current) {
+            externalAudioRef.current.playbackRate = 2.0;
+          }
+        }
+      }, 380);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!touchTrackingRef.current.isTracking || e.touches.length !== 1) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const coords = getVisualTouchCoords(e.touches[0], rect);
+    const tracking = touchTrackingRef.current;
+    const dx = coords.x - tracking.startX;
+    const dy = coords.y - tracking.startY;
+
+    // Lock gesture type once movement threshold is crossed
+    if (tracking.type === 'none') {
+      if (Math.abs(dx) > 16 || Math.abs(dy) > 16) {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+
+        if (tracking.wasLeftEdge && dx > 20 && Math.abs(dx) > Math.abs(dy)) {
+          tracking.type = 'backSwipe';
+        } else if (Math.abs(dx) > Math.abs(dy)) {
+          tracking.type = 'seeking';
+        } else {
+          if (tracking.startX > tracking.width * 0.5) {
+            tracking.type = 'volume';
+          } else {
+            tracking.type = 'brightness';
+          }
+        }
+      }
+    }
+
+    if (tracking.type === 'seeking' && canControl) {
+      if (e.cancelable) e.preventDefault();
+      const seekFactor = Math.min(180, Math.max(60, duration * 0.15));
+      const deltaSec = Math.round((dx / (tracking.width * 0.85)) * seekFactor);
+      const target = Math.max(0, Math.min(duration, tracking.initialTime + deltaSec));
+      tracking.targetTime = target;
+
+      setGestureFeedback({
+        type: 'seek',
+        valueText: `${deltaSec >= 0 ? '+' : ''}${deltaSec}s`,
+        subText: `${formatTime(target)} / ${formatTime(duration)}`,
+        percent: (target / (duration || 1)) * 100
+      });
+    } else if (tracking.type === 'volume') {
+      if (e.cancelable) e.preventDefault();
+      const deltaVol = -(dy / (tracking.height * 0.7));
+      const newVol = Math.max(0, Math.min(1, tracking.initialVolume + deltaVol));
+      setVolume(newVol);
+      setIsMuted(newVol === 0);
+      if (videoRef.current) videoRef.current.volume = newVol;
+      if (externalAudioRef.current) externalAudioRef.current.volume = newVol;
+
+      setGestureFeedback({
+        type: 'volume',
+        valueText: `${Math.round(newVol * 100)}%`,
+        percent: newVol * 100
+      });
+    } else if (tracking.type === 'brightness') {
+      if (e.cancelable) e.preventDefault();
+      const deltaBright = -(dy / (tracking.height * 0.7));
+      const newBright = Math.max(0.3, Math.min(1.6, tracking.initialBrightness + deltaBright));
+      setBrightness(newBright);
+
+      setGestureFeedback({
+        type: 'brightness',
+        valueText: `${Math.round((newBright / 1.0) * 100)}%`,
+        percent: Math.round(((newBright - 0.3) / 1.3) * 100)
+      });
+    } else if (tracking.type === 'backSwipe') {
+      if (e.cancelable) e.preventDefault();
+      setGestureFeedback({
+        type: 'back',
+        valueText: dx > 60 ? 'Release to Exit Fullscreen' : 'Swipe to Exit Fullscreen',
+        percent: Math.min(100, (dx / 70) * 100)
+      });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    if (isPressAndHold2xRef.current) {
+      setIsPressAndHold2x(false);
+      if (videoRef.current) videoRef.current.playbackRate = playbackRate;
+      if (externalAudioRef.current) externalAudioRef.current.playbackRate = playbackRate;
+      touchTrackingRef.current.isTracking = false;
+      return;
+    }
+
+    const tracking = touchTrackingRef.current;
+    if (tracking.type === 'seeking' && canControl) {
+      const target = tracking.targetTime;
+      setCurrentTime(target);
+      onSeek(target);
+      if (externalAudioRef.current) externalAudioRef.current.currentTime = target;
+      resetControlsTimeout();
+    } else if (tracking.type === 'backSwipe') {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const coords = getVisualTouchCoords(e.changedTouches[0], rect);
+        const dx = coords.x - tracking.startX;
+        if (dx > 55) {
+          handleExitFullscreen();
+        }
+      }
+    }
+
+    if (tracking.type !== 'none') {
+      if (gestureFeedbackTimerRef.current) clearTimeout(gestureFeedbackTimerRef.current);
+      gestureFeedbackTimerRef.current = setTimeout(() => {
+        setGestureFeedback({ type: null, valueText: '' });
+      }, 550);
+      tracking.isTracking = false;
+      tracking.type = 'none';
+      return;
+    }
+
+    // Touch tap / double-tap handling
+    const now = Date.now();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const coords = getVisualTouchCoords(e.changedTouches[0], rect);
+      const isRightHalf = coords.x > coords.width / 2;
+
+      if (now - lastTapRef.current.time < 300) {
+        if (singleClickTimerRef.current) {
+          clearTimeout(singleClickTimerRef.current);
+          singleClickTimerRef.current = null;
+        }
+        triggerSkip(isRightHalf ? 'right' : 'left');
+        lastTapRef.current = { time: 0, x: 0, y: 0 };
+      } else {
+        lastTapRef.current = { time: now, x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+        if (singleClickTimerRef.current) clearTimeout(singleClickTimerRef.current);
+        const wasOpen = controlsOpenAtTouchRef.current;
+        singleClickTimerRef.current = setTimeout(() => {
+          if (wasOpen) {
+            setShowControls(false);
+            setShowFitMenu(false);
+            setShowSubtitleMenu(false);
+            setShowAudioMenu(false);
+            setShowQuickReactions(false);
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+          } else {
+            setShowControls(true);
+            resetControlsTimeout();
+          }
+          singleClickTimerRef.current = null;
+        }, 260);
+      }
+    }
+
+    touchTrackingRef.current.isTracking = false;
+  };
+
+  // Desktop Mouse pointer handlers (ignores touch events to prevent double processing)
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // If clicking on an interactive control element, don't trigger gestures
+    if (e.pointerType === 'touch') return;
     if ((e.target as HTMLElement).closest('button, input, select, a, [data-interactive="true"]')) {
       return;
     }
 
     pointerStartRef.current = { x: e.clientX, y: e.clientY };
     wasLongPressRef.current = false;
-    // Snapshot controls visibility at the instant touch begins
     controlsOpenAtTouchRef.current = showControls;
 
-    // Start Long-Press timer: hold for 380ms ➔ 2x Speed
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = setTimeout(() => {
       if (videoRef.current && isPlaying) {
@@ -676,77 +1040,50 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return;
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
 
-    // If we were holding for 2x speed, restore original speed immediately
     if (isPressAndHold2xRef.current) {
       setIsPressAndHold2x(false);
-      if (videoRef.current) {
-        videoRef.current.playbackRate = playbackRate;
-      }
-      if (externalAudioRef.current) {
-        externalAudioRef.current.playbackRate = playbackRate;
-      }
+      if (videoRef.current) videoRef.current.playbackRate = playbackRate;
+      if (externalAudioRef.current) externalAudioRef.current.playbackRate = playbackRate;
       return;
     }
 
-    // If it was a long-press release, do not trigger single/double clicks
-    if (wasLongPressRef.current) {
-      return;
-    }
+    if (wasLongPressRef.current) return;
+    if ((e.target as HTMLElement).closest('button, input, select, a, [data-interactive="true"]')) return;
 
-    // If clicking on an interactive control element, don't handle screen tap
-    if ((e.target as HTMLElement).closest('button, input, select, a, [data-interactive="true"]')) {
-      return;
-    }
-
-    // Verify pointer didn't move too much (to ignore drags)
     const dx = Math.abs(e.clientX - pointerStartRef.current.x);
     const dy = Math.abs(e.clientY - pointerStartRef.current.y);
-    if (dx > 25 || dy > 25) {
-      return;
-    }
+    if (dx > 25 || dy > 25) return;
 
     const now = Date.now();
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    let isRightHalf = false;
-    if (isRotatedLandscape) {
-      // 90deg clockwise: top of phone is visual left (-10s), bottom of phone is visual right (+10s)
-      isRightHalf = (e.clientY - rect.top) > rect.height / 2;
-    } else {
-      const clickX = e.clientX - rect.left;
-      isRightHalf = clickX > rect.width / 2;
-    }
+    const isRightHalf = (e.clientX - rect.left) > rect.width / 2;
 
-    // Check if this is a Double Tap (within 300ms of previous tap)
     if (now - lastTapRef.current.time < 300) {
-      // Cancel pending single-click toggle
       if (singleClickTimerRef.current) {
         clearTimeout(singleClickTimerRef.current);
         singleClickTimerRef.current = null;
       }
-
-      // Trigger 10 seconds skip!
       triggerSkip(isRightHalf ? 'right' : 'left');
       lastTapRef.current = { time: 0, x: 0, y: 0 };
     } else {
-      // Record first tap
       lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
-
-      // Set single-click timer (260ms) to toggle controls HUD (VLC / MX Player style)
-      if (singleClickTimerRef.current) {
-        clearTimeout(singleClickTimerRef.current);
-      }
+      if (singleClickTimerRef.current) clearTimeout(singleClickTimerRef.current);
       const wasOpen = controlsOpenAtTouchRef.current;
       singleClickTimerRef.current = setTimeout(() => {
         if (wasOpen) {
           setShowControls(false);
           setShowFitMenu(false);
+          setShowSubtitleMenu(false);
+          setShowAudioMenu(false);
+          setShowQuickReactions(false);
           if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         } else {
           setShowControls(true);
@@ -902,6 +1239,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   return (
     <div
       ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
@@ -972,6 +1313,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             src={videoSrc}
             playsInline
             preload="metadata"
+            style={{ filter: brightness !== 1.0 ? `brightness(${brightness})` : undefined }}
             onLoadStart={handleLoadStart}
             onLoadedMetadata={handleLoadedMetadata}
             onLoadedData={handleLoadedData}
@@ -1198,8 +1540,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               showControls ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-full opacity-0 pointer-events-none'
             }`}
           >
-            {/* Left: Back button (if Fullscreen or Rotated Landscape), Rotate button & Movie Title */}
-            <div className="flex items-center gap-2.5 min-w-0">
+            {/* Left: Back button (if Fullscreen or Rotated Landscape), Movie Title & Duration */}
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
               {(isFullscreen || isRotatedLandscape) && (
                 <button
                   type="button"
@@ -1207,7 +1549,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     e.stopPropagation();
                     handleExitFullscreen();
                   }}
-                  className="p-1.5 sm:p-2 rounded-xl bg-zinc-900/80 hover:bg-emerald-950/60 text-white border border-emerald-900/40 hover:border-emerald-600/60 flex items-center gap-1.5 transition-all cursor-pointer shadow-lg active:scale-95"
+                  className="p-1.5 sm:p-2 rounded-xl bg-zinc-900/80 hover:bg-emerald-950/60 text-white border border-emerald-900/40 hover:border-emerald-600/60 flex items-center gap-1.5 transition-all cursor-pointer shadow-lg active:scale-95 shrink-0"
                   aria-label="Back"
                   title="Back (Exit Fullscreen / Landscape)"
                 >
@@ -1216,37 +1558,79 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 </button>
               )}
 
-              {/* Rotate Screen button (Landscape / Portrait) */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleRotateLandscape();
-                }}
-                className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 ${
-                  isRotatedLandscape
-                    ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-900/50'
-                    : 'bg-zinc-900/80 hover:bg-emerald-950/60 text-zinc-300 hover:text-white border-emerald-900/40 hover:border-emerald-600/60'
-                }`}
-                aria-label="Rotate Orientation"
-                title={isRotatedLandscape ? 'Switch to Portrait' : 'Rotate to Landscape'}
-              >
-                <RotateCw className={`w-4 h-4 ${isRotatedLandscape ? 'text-white' : 'text-emerald-400'}`} />
-                <span className="text-[11px] font-semibold hidden xs:inline">
-                  {isRotatedLandscape ? 'Portrait' : 'Landscape'}
-                </span>
-              </button>
-
-              <span className="text-xs sm:text-sm font-semibold text-white tracking-tight truncate max-w-[120px] xs:max-w-[200px] sm:max-w-md">
+              <span className="text-xs sm:text-sm font-semibold text-white tracking-tight truncate max-w-[110px] xs:max-w-[180px] sm:max-w-md">
                 {fileName}
               </span>
               <span className="text-[10px] font-mono text-emerald-300 bg-zinc-950/80 px-2 py-0.5 rounded-md border border-emerald-900/40 shrink-0">
                 {formatTime(duration)}
               </span>
+
+              {/* Partner is speaking badge in top HUD */}
+              {partnerIsSpeaking && (
+                <div className="hidden xs:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-[10px] sm:text-xs font-semibold animate-pulse shadow-md shrink-0">
+                  <Volume2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 animate-bounce" />
+                  <span className="truncate max-w-[80px] sm:max-w-[110px]">{partnerName || 'Partner'}</span>
+                </div>
+              )}
             </div>
 
-            {/* Right: Aspect Fit Selector & Change File */}
-            <div className="flex items-center gap-2" data-interactive="true">
+            {/* Right: In-Player Mic, In-Player Chat, Aspect Fit & Change Video */}
+            <div className="flex items-center gap-1.5 sm:gap-2" data-interactive="true">
+              {/* In-Player Mic Toggle in Top HUD */}
+              {voiceEnabled && onToggleVoiceMute && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleVoiceMute();
+                  }}
+                  className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 shrink-0 ${
+                    isVoiceMuted
+                      ? 'bg-zinc-900/80 hover:bg-zinc-800 text-rose-400 border-rose-900/50'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-950'
+                  }`}
+                  title={isVoiceMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+                >
+                  {isVoiceMuted ? (
+                    <MicOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" />
+                  ) : (
+                    <div className="relative">
+                      <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                      {isSpeakingLocally && (
+                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white animate-ping" />
+                      )}
+                    </div>
+                  )}
+                  <span className="text-[11px] font-semibold hidden md:inline">
+                    {isVoiceMuted ? 'Unmute' : isSpeakingLocally ? 'Speaking' : 'Mic'}
+                  </span>
+                </button>
+              )}
+
+              {/* In-Player Live Chat Button */}
+              {onSendMessage && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsChatOpen(prev => !prev);
+                  }}
+                  className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 shrink-0 ${
+                    isChatOpen
+                      ? 'bg-emerald-600 text-white border-emerald-400'
+                      : 'bg-zinc-900/80 hover:bg-emerald-950/60 text-zinc-300 hover:text-white border-emerald-900/40 hover:border-emerald-600/60'
+                  }`}
+                  title="Open Live Chat"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+                  <span className="text-[11px] font-semibold hidden md:inline">Chat</span>
+                  {messages && messages.length > 0 && (
+                    <span className="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.2 rounded-full border border-emerald-800/60 font-mono">
+                      {messages.length}
+                    </span>
+                  )}
+                </button>
+              )}
               {/* Aspect Ratio / Fit Selector */}
               <div className="relative">
                 <button
@@ -1436,21 +1820,49 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
               {/* Right: Quick Reaction 💚, Volume, Speed, CC, Audio, Rotate, Fullscreen */}
               <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto" data-interactive="true" onClick={(e) => e.stopPropagation()}>
-                {/* Send 💚 Reaction inside controls HUD */}
+                {/* Send Reactions inside controls HUD */}
                 {reactionsEnabled && onSendReaction && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSendReaction('💚');
-                      resetControlsTimeout();
-                    }}
-                    className="p-1 sm:p-1.5 rounded-lg bg-emerald-950/50 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 active:scale-125 cursor-pointer shrink-0"
-                    title="Send 💚 Reaction"
-                  >
-                    <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-emerald-400 text-emerald-400" />
-                    <span className="text-[10px] sm:text-[11px] font-semibold hidden md:inline">React</span>
-                  </button>
+                  <div className="relative shrink-0 flex items-center">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowQuickReactions(prev => !prev);
+                        resetControlsTimeout();
+                      }}
+                      className={`p-1 sm:p-1.5 rounded-lg border transition-all flex items-center gap-1 active:scale-125 cursor-pointer shrink-0 ${
+                        showQuickReactions
+                          ? 'bg-emerald-600 text-white border-emerald-400'
+                          : 'bg-emerald-950/50 hover:bg-emerald-900/50 border-emerald-800/40 text-emerald-400 hover:text-emerald-300'
+                      }`}
+                      title="Send Reaction"
+                    >
+                      <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-emerald-400 text-emerald-400" />
+                      <span className="text-[10px] sm:text-[11px] font-semibold hidden md:inline">React</span>
+                    </button>
+
+                    {showQuickReactions && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute bottom-full mb-2 left-0 sm:left-auto sm:right-0 bg-zinc-950/95 border border-emerald-900/60 shadow-2xl rounded-2xl p-1.5 backdrop-blur-xl flex items-center gap-1 z-50 animate-in fade-in zoom-in-95"
+                      >
+                        {['💚', '❤️', '😂', '🔥', '👏', '🍿', '😮'].map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => {
+                              onSendReaction(emoji);
+                              setShowQuickReactions(false);
+                              resetControlsTimeout();
+                            }}
+                            className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-base sm:text-lg hover:bg-zinc-800/80 rounded-xl active:scale-125 transition-transform cursor-pointer"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Volume */}
@@ -1704,6 +2116,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                         <p className="text-[10px] text-zinc-400 leading-tight px-1 text-center">
                           Select an external .m4a, .aac, .mp3 or .wav audio file for Tamil
                         </p>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              if (videoRef.current && 'setSinkId' in videoRef.current) {
+                                await (videoRef.current as any).setSinkId('');
+                              }
+                              if (externalAudioRef.current && 'setSinkId' in externalAudioRef.current) {
+                                await (externalAudioRef.current as any).setSinkId('');
+                              }
+                            } catch (err) {
+                              console.warn('Sync audio sink error:', err);
+                            }
+                          }}
+                          className="w-full py-1.5 px-2.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-zinc-700/60"
+                          title="Re-route audio to newly connected Bluetooth earpods or headphones"
+                        >
+                          <Headphones className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Re-sync to Earpods / Headset</span>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1720,33 +2152,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   <PictureInPicture className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
 
-                {/* Rotate Landscape */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleRotateLandscape();
-                  }}
-                  className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center shrink-0 border ${
-                    isRotatedLandscape
-                      ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-950'
-                      : 'bg-zinc-900/80 hover:bg-emerald-950/60 text-zinc-300 hover:text-white border-emerald-900/50 hover:border-emerald-600/60'
-                  }`}
-                  aria-label="Rotate Orientation"
-                  title={isRotatedLandscape ? 'Switch to Portrait' : 'Rotate to Landscape'}
-                >
-                  <RotateCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isRotatedLandscape ? 'text-white' : 'text-emerald-400'}`} />
-                </button>
+                {/* In-Player Live Chat Button */}
+                {onSendMessage && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsChatOpen(prev => !prev);
+                    }}
+                    className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
+                      isChatOpen
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                    }`}
+                    title="Live Chat"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span className="text-[10px] sm:text-[11px] font-medium hidden lg:inline">Chat</span>
+                  </button>
+                )}
 
-                {/* Fullscreen / Expand */}
+                {/* Fullscreen / Landscape (Single Unified Button: auto-rotates on mobile, standard on laptop) */}
                 <button
                   type="button"
                   onClick={toggleFullscreen}
                   className="p-1 sm:p-1.5 text-zinc-200 hover:text-white rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/60 hover:border-emerald-600/50 transition-colors cursor-pointer shrink-0"
                   aria-label="Toggle fullscreen"
-                  title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen & Landscape'}
+                  title={isFullscreen || isRotatedLandscape ? 'Exit Fullscreen' : 'Fullscreen & Landscape'}
                 >
-                  {isFullscreen ? (
+                  {isFullscreen || isRotatedLandscape ? (
                     <Minimize className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
                   ) : (
                     <Maximize className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -1755,6 +2189,232 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </div>
             </div>
           </div>
+
+          {/* IN-PLAYER FLOATING REACTIONS */}
+          {reactions && reactions.length > 0 && (
+            <ReactionOverlay reactions={reactions} />
+          )}
+
+          {/* VLC / MX PLAYER GESTURE FEEDBACK HUD PILL */}
+          {gestureFeedback.type && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-35 animate-in fade-in zoom-in-95 duration-100">
+              <div className="flex flex-col items-center justify-center px-6 py-4 rounded-2xl bg-black/85 border border-emerald-500/50 text-white shadow-2xl backdrop-blur-xl min-w-[140px]">
+                {gestureFeedback.type === 'seek' && (
+                  <>
+                    <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-lg font-mono">
+                      {gestureFeedback.valueText.startsWith('-') ? <RotateCcw className="w-5 h-5" /> : <RotateCw className="w-5 h-5" />}
+                      <span>{gestureFeedback.valueText}</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-zinc-300 mt-1">
+                      {gestureFeedback.subText}
+                    </span>
+                    <div className="w-28 h-1.5 bg-zinc-800 rounded-full mt-2.5 overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${gestureFeedback.percent}%` }} />
+                    </div>
+                  </>
+                )}
+                {gestureFeedback.type === 'volume' && (
+                  <>
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-lg">
+                      {isMuted || volume === 0 ? <VolumeX className="w-6 h-6 text-rose-400" /> : <Volume2 className="w-6 h-6" />}
+                      <span className="font-mono">{gestureFeedback.valueText}</span>
+                    </div>
+                    <div className="w-28 h-1.5 bg-zinc-800 rounded-full mt-2.5 overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${gestureFeedback.percent}%` }} />
+                    </div>
+                  </>
+                )}
+                {gestureFeedback.type === 'brightness' && (
+                  <>
+                    <div className="flex items-center gap-2 text-amber-300 font-bold text-lg">
+                      <Sun className="w-6 h-6 text-amber-400" />
+                      <span className="font-mono">{gestureFeedback.valueText}</span>
+                    </div>
+                    <div className="w-28 h-1.5 bg-zinc-800 rounded-full mt-2.5 overflow-hidden">
+                      <div className="h-full bg-amber-400 rounded-full" style={{ width: `${gestureFeedback.percent}%` }} />
+                    </div>
+                  </>
+                )}
+                {gestureFeedback.type === 'back' && (
+                  <div className="flex items-center gap-2 text-emerald-300 font-semibold text-sm">
+                    <ArrowLeft className="w-5 h-5 animate-pulse" />
+                    <span>{gestureFeedback.valueText}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* FLOATING CUTE INCOMING MESSAGE TOASTS (Side / Landscape) */}
+          {floatingMessages.length > 0 && !isChatOpen && (
+            <div
+              className="absolute top-16 right-3 sm:right-6 z-40 flex flex-col gap-2.5 pointer-events-none max-w-[280px] xs:max-w-xs animate-in slide-in-from-right-4 duration-300"
+              data-interactive="true"
+            >
+              {floatingMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsChatOpen(true);
+                  }}
+                  className="pointer-events-auto p-3 rounded-2xl bg-zinc-950/90 hover:bg-zinc-900 border border-emerald-500/50 shadow-2xl backdrop-blur-xl transition-all cursor-pointer flex items-start gap-2.5 group active:scale-95"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 text-emerald-400 font-bold text-xs mt-0.5">
+                    {msg.senderName.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[11px] font-bold text-emerald-400 truncate">
+                        {msg.senderName}
+                      </span>
+                      <span className="text-[9px] text-zinc-500 font-mono">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-200 mt-0.5 line-clamp-2 break-words leading-snug">
+                      {msg.message}
+                    </p>
+                    <span className="text-[9px] text-emerald-300/80 font-medium group-hover:text-emerald-300 mt-1 inline-flex items-center gap-1">
+                      <span>Tap to reply in chat 💬</span>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* IN-PLAYER LIVE CHAT DRAWER (Google Meet style) */}
+          {isChatOpen && (
+            <div
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              data-interactive="true"
+              className="absolute top-0 right-0 bottom-0 w-80 sm:w-92 max-w-[88vw] bg-zinc-950/95 border-l border-emerald-900/60 shadow-2xl z-45 backdrop-blur-2xl flex flex-col animate-in slide-in-from-right duration-200"
+            >
+              {/* Header */}
+              <div className="p-3.5 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-900/60 shrink-0">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-xs font-bold text-white tracking-wide uppercase">
+                    Live Chat
+                  </h3>
+                  <span className="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/60 font-mono">
+                    {messages?.length || 0}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsChatOpen(false)}
+                  className="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+                  title="Close Chat"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Messages List */}
+              <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5">
+                {!messages || messages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6 text-zinc-500">
+                    <Heart className="w-8 h-8 text-emerald-500/20 mb-2" />
+                    <p className="text-xs text-zinc-400">
+                      No messages yet. Send a note to your partner!
+                    </p>
+                  </div>
+                ) : (
+                  messages.map((msg) => {
+                    const isMe = msg.senderId === currentParticipantId;
+                    const isSystem = msg.type === 'SYSTEM';
+
+                    if (isSystem) {
+                      return (
+                        <div key={msg.id} className="flex justify-center my-1.5">
+                          <span className="text-[10px] text-zinc-400 bg-zinc-900/90 border border-zinc-800 px-2.5 py-0.5 rounded-full text-center max-w-[90%]">
+                            {msg.message}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-0.5 px-1">
+                          <span className={`text-[10px] font-semibold ${isMe ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                            {isMe ? 'You' : msg.senderName}
+                          </span>
+                          <span className="text-[9px] text-zinc-600 font-mono">
+                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+
+                        <div
+                          className={`px-3 py-1.5 rounded-2xl text-xs max-w-[85%] break-words leading-relaxed ${
+                            isMe
+                              ? 'bg-emerald-600 text-white rounded-tr-none shadow-md shadow-emerald-950/40'
+                              : 'bg-zinc-800/90 text-zinc-200 rounded-tl-none border border-zinc-700/60'
+                          }`}
+                        >
+                          {msg.message}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={chatDrawerEndRef} />
+              </div>
+
+              {/* Quick Reactions Bar in Drawer */}
+              {reactionsEnabled && onSendReaction && (
+                <div className="px-2.5 py-1.5 border-t border-zinc-800/60 bg-zinc-900/30 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+                    {['💚', '❤️', '😂', '🔥', '👏', '🍿', '😮'].map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => onSendReaction(emoji)}
+                        className="w-7 h-7 flex items-center justify-center text-sm rounded-lg hover:bg-zinc-800 active:scale-125 transition-transform cursor-pointer"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Message Input Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const trimmed = inPlayerMessageText.trim();
+                  if (!trimmed || !onSendMessage) return;
+                  onSendMessage(trimmed);
+                  setInPlayerMessageText('');
+                }}
+                className="p-2.5 border-t border-zinc-800/80 bg-zinc-900/50 flex items-center gap-2 shrink-0"
+              >
+                <input
+                  type="text"
+                  value={inPlayerMessageText}
+                  onChange={(e) => setInPlayerMessageText(e.target.value)}
+                  placeholder="Type a message..."
+                  maxLength={500}
+                  className="flex-1 px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+                <button
+                  type="submit"
+                  disabled={!inPlayerMessageText.trim()}
+                  className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed text-white shadow-md shadow-emerald-600/30 transition-all flex items-center justify-center cursor-pointer shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
+          )}
         </>
       )}
     </div>

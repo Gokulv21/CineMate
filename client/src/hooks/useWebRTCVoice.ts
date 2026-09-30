@@ -101,6 +101,33 @@ export function useWebRTCVoice({
     };
   }, [unlockAudioContext]);
 
+  // Re-route audio to newly connected Bluetooth earpods or headphones mid-session
+  useEffect(() => {
+    const handleDeviceChange = async () => {
+      console.log('[WEBRTC] Audio device change detected: re-routing to active earpods/output device');
+      remoteAudioElementsRef.current.forEach(async (audioEl) => {
+        try {
+          if ('setSinkId' in audioEl) {
+            await (audioEl as any).setSinkId('');
+          }
+          audioEl.play().catch(() => {});
+        } catch (err) {
+          console.warn('[WEBRTC] Failed to setSinkId on audioEl:', err);
+        }
+      });
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
+      }
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+      return () => {
+        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+      };
+    }
+  }, []);
+
   // Drain and apply queued early ICE candidates once remote description is set
   const drainIceCandidates = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
     const queue = pendingCandidatesRef.current.get(peerId);
@@ -208,11 +235,12 @@ export function useWebRTCVoice({
 
       audioEl.srcObject = streamToPlay;
 
+      // Audio element handles clean, hardware-synchronized audio output directly to connected earpods/speaker
       audioEl.play().catch((e) => {
         console.warn('[WEBRTC] Audio autoplay waiting for gesture:', e);
       });
 
-      // Route stream through Web Audio API destination with volume boost
+      // Route stream through Web Audio API analyser for speaking detection (without duplicate speaker output)
       try {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioCtx) {
@@ -224,10 +252,6 @@ export function useWebRTCVoice({
             audioCtx.resume().catch(() => {});
           }
           const remoteSource = audioCtx.createMediaStreamSource(streamToPlay);
-          const remoteGain = audioCtx.createGain();
-          remoteGain.gain.value = 1.25; // 25% boost for voice clarity over movies
-          remoteSource.connect(remoteGain);
-          remoteGain.connect(audioCtx.destination);
 
           // Monitor remote partner voice activity (for partner is speaking indicator)
           const remoteAnalyser = audioCtx.createAnalyser();

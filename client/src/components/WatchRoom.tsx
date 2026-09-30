@@ -423,6 +423,16 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
               videoEventHandlers={eventHandlers}
               onSendReaction={handleSendReaction}
               reactionsEnabled={room?.settings.reactionsEnabled ?? true}
+              reactions={reactions}
+              messages={messages}
+              currentParticipantId={myParticipantId}
+              onSendMessage={handleSendMessage}
+              voiceEnabled={room?.settings.voiceChat ?? true}
+              isVoiceMuted={isMuted}
+              onToggleVoiceMute={toggleMute}
+              isSpeakingLocally={isSpeakingLocally}
+              partnerIsSpeaking={partnerIsSpeaking}
+              partnerName={partnerName}
             />
           </div>
 
