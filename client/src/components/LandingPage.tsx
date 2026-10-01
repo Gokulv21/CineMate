@@ -1,17 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-  Heart, 
-  Play, 
-  ShieldCheck, 
-  Mic, 
-  Zap, 
-  Sparkles, 
   ArrowRight, 
+  Zap, 
+  Volume2, 
   FileVideo, 
-  Users, 
-  Lock,
-  Download
+  ShieldCheck,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Share2,
+  Users,
+  HardDrive,
+  Clock
 } from 'lucide-react';
 import { LanguageSelector } from './LanguageSelector.js';
 
@@ -30,269 +31,415 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 }) => {
   const { t } = useTranslation();
 
-  return (
-    <div className="flex flex-col min-h-screen">
-      {/* Hero Section */}
-      <section className="relative pt-12 pb-20 md:pt-20 md:pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-emerald-600/10 rounded-full blur-[140px] pointer-events-none" />
-
-        <div className="max-w-5xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/90 border border-emerald-900/40 text-xs font-medium text-emerald-300 mb-8 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{t('hero.badge')}</span>
-          </div>
-
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white leading-[1.1] max-w-4xl mx-auto">
-            {t('hero.title')}
-          </h1>
-
-          <p className="mt-6 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            {t('hero.subtitle')}
-          </p>
-
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button
-              onClick={onCreateRoom}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-xl shadow-emerald-600/25 border border-emerald-500/40 hover:shadow-emerald-600/40 active:scale-95 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
-            >
-              <Heart className="w-5 h-5 fill-white" />
-              <span>{t('hero.createButton')}</span>
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </button>
-            <button
-              onClick={onJoinRoom}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-medium text-zinc-200 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-emerald-900/50 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Users className="w-5 h-5 text-zinc-400" />
-              <span>{t('hero.joinButton')}</span>
-            </button>
-          </div>
-
-          {/* Quick PWA Install Callout Banner */}
-          {!isInstalled && onInstallApp && (
-            <div className="mt-8 max-w-md mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <button
-                type="button"
-                onClick={onInstallApp}
-                className="w-full p-3 sm:p-3.5 rounded-2xl bg-zinc-950/80 hover:bg-emerald-950/40 border border-emerald-500/30 hover:border-emerald-500/60 shadow-xl shadow-emerald-950/40 flex items-center justify-between group transition-all cursor-pointer active:scale-98"
-              >
-                <div className="flex items-center gap-3 text-left">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-                    <Download className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white flex items-center gap-2">
-                      <span>Install CineMate as an App</span>
-                      <span className="text-[9px] font-mono uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded font-semibold">
-                        PWA
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 mt-0.5">
-                      1-tap launch from home screen • No URL bar needed
-                    </p>
-                  </div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
-              </button>
+  // Smart Feature Slides about the App & Usage
+  const slides = [
+    {
+      id: 1,
+      badge: 'Step 01 • Instant Setup',
+      title: 'Create a private room in 1 tap',
+      description: 'Start a room and get an instant 6-letter room code or direct invite link. No account creation, email, or passwords required.',
+      icon: Users,
+      visual: (
+        <div className="w-full h-full flex flex-col justify-center items-center p-6 text-center">
+          <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] max-w-sm w-full shadow-lg">
+            <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 block">YOUR PRIVATE ROOM</span>
+            <p className="text-3xl font-mono font-bold tracking-widest text-white mt-1">#AB7XK9</p>
+            <div className="mt-3 flex items-center justify-center gap-2 text-xs text-zinc-400">
+              <Share2 className="w-3.5 h-3.5 text-zinc-300" />
+              <span>Share link with your partner</span>
             </div>
-          )}
-
-          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-500">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>{t('brand.privacyBadge')}</span>
+            <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-[11px] text-zinc-400">
+              <span>Status: Waiting for partner</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            </div>
           </div>
-
-          {/* Hero Visual Mockup */}
-          <div className="mt-16 max-w-4xl mx-auto rounded-2xl cinema-surface border border-emerald-900/30 p-4 sm:p-6 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 border-b border-zinc-800/80">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
-                <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
-                <span className="w-3 h-3 rounded-full bg-teal-500/80 inline-block" />
-                <span className="ml-2 text-xs font-medium text-zinc-400">CineMate Private Room • AB7XK9</span>
+        </div>
+      )
+    },
+    {
+      id: 2,
+      badge: 'Step 02 • True Local Privacy',
+      title: 'Pick any video directly from your device',
+      description: 'Each person selects their own video file (MP4, MKV, WebM). The file stays on your computer and is never uploaded to any cloud server.',
+      icon: HardDrive,
+      visual: (
+        <div className="w-full h-full flex flex-col justify-center items-center p-6 text-center">
+          <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] max-w-sm w-full shadow-lg text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/[0.08] flex items-center justify-center text-white shrink-0">
+                <FileVideo className="w-5 h-5" />
               </div>
-              <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 px-2.5 py-1 rounded-full">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Synced (0.02s)
-                </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-white truncate">Interstellar_1080p.mkv</p>
+                <p className="text-[11px] text-zinc-500">2.4 GB • Local Storage</p>
               </div>
             </div>
-
-            <div className="relative aspect-video rounded-xl bg-gradient-to-b from-zinc-900 via-zinc-950 to-black overflow-hidden flex flex-col justify-between p-6 border border-zinc-800/60 my-4">
-              <div className="flex justify-between items-start z-10">
-                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800 backdrop-blur-md shadow-lg">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs font-bold">
-                    A
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xs font-semibold text-white leading-tight">User A</p>
-                    <p className="text-[10px] text-zinc-400">Tokyo • Local Video</p>
-                  </div>
-                  <Mic className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                </div>
-
-                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800 backdrop-blur-md shadow-lg">
-                  <Mic className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                  <div className="text-right">
-                    <p className="text-xs font-semibold text-white leading-tight">User B</p>
-                    <p className="text-[10px] text-zinc-400">London • Local Video</p>
-                  </div>
-                  <div className="w-7 h-7 rounded-lg bg-teal-600/20 border border-teal-500/40 text-teal-400 flex items-center justify-center text-xs font-bold">
-                    B
-                  </div>
-                </div>
+            <div className="mt-3 p-2.5 rounded-xl bg-black/40 border border-white/[0.04] text-[11px] text-zinc-300 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Zero server upload • 100% private</span>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 3,
+      badge: 'Step 03 • Frame-Perfect Harmony',
+      title: 'Sub-second real-time playback sync',
+      description: 'When either person plays, pauses, or seeks, both screens stay aligned within milliseconds using continuous clock drift correction.',
+      icon: Clock,
+      visual: (
+        <div className="w-full h-full flex flex-col justify-center items-center p-6 text-center">
+          <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] max-w-sm w-full shadow-lg">
+            <div className="flex items-center justify-between text-xs text-zinc-400 mb-2">
+              <span className="font-semibold text-white">Playback Timeline</span>
+              <span className="text-emerald-400 font-mono text-[11px]">Sync Drift: 0.01s</span>
+            </div>
+            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden relative">
+              <div className="h-full bg-white w-2/3 rounded-full" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs">
+              <div className="p-2 rounded-xl bg-black/40 border border-white/[0.04]">
+                <span className="text-[10px] text-zinc-500 block">YOU</span>
+                <span className="font-mono text-zinc-200">01:24:32</span>
               </div>
-
-              <div className="flex flex-col items-center justify-center my-auto z-10">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-600/10 border border-emerald-500/30 flex items-center justify-center shadow-2xl relative group">
-                  <Play className="w-7 h-7 text-emerald-400 fill-emerald-400 ml-1" />
-                  <div className="absolute -inset-1 rounded-2xl bg-emerald-500/20 blur-md -z-10 animate-pulse" />
-                </div>
-                <p className="text-xs text-zinc-400 font-medium mt-3">Interstellar (2014) • 01:24:32 / 02:49:00</p>
-              </div>
-
-              <div className="z-10 bg-zinc-900/90 border border-zinc-800/80 rounded-xl p-3 backdrop-blur-md">
-                <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 mb-1.5">
-                  <span className="text-emerald-400 font-semibold">01:24:32</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-zinc-500">💚 😂 🔥</span>
-                  </div>
-                  <span>02:49:00</span>
-                </div>
-                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden relative">
-                  <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 w-[50%] rounded-full relative">
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white shadow-md" />
-                  </div>
-                </div>
+              <div className="p-2 rounded-xl bg-black/40 border border-white/[0.04]">
+                <span className="text-[10px] text-zinc-500 block">PARTNER</span>
+                <span className="font-mono text-zinc-200">01:24:32</span>
               </div>
             </div>
           </div>
         </div>
+      )
+    },
+    {
+      id: 4,
+      badge: 'Step 04 • Intimate Cinema',
+      title: 'Built-in voice chat & reactions',
+      description: 'Talk naturally with low-latency WebRTC audio and react with live emojis without needing Discord, Zoom, or third-party voice apps.',
+      icon: Volume2,
+      visual: (
+        <div className="w-full h-full flex flex-col justify-center items-center p-6 text-center">
+          <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] max-w-sm w-full shadow-lg">
+            <div className="flex items-center justify-around py-2">
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-bold text-xs text-white">
+                  G
+                </div>
+                <span className="text-[11px] text-zinc-300 mt-1">Gokul</span>
+                <span className="text-[9px] text-emerald-400">Speaking</span>
+              </div>
+              <div className="flex gap-1 items-center">
+                <span className="w-1 h-3 bg-white/60 rounded-full animate-pulse" />
+                <span className="w-1 h-5 bg-white rounded-full animate-pulse" />
+                <span className="w-1 h-2 bg-white/60 rounded-full animate-pulse" />
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-bold text-xs text-white">
+                  S
+                </div>
+                <span className="text-[11px] text-zinc-300 mt-1">Partner</span>
+                <span className="text-[9px] text-zinc-500">Listening</span>
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-center gap-2 text-sm">
+              <span>❤️</span>
+              <span>🍿</span>
+              <span>😂</span>
+              <span>🔥</span>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  ];
+
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Auto-advance slides every 5 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % slides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [slides.length]);
+
+  const nextSlide = () => setCurrentSlide((currentSlide + 1) % slides.length);
+  const prevSlide = () => setCurrentSlide((currentSlide - 1 + slides.length) % slides.length);
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      
+      {/* Hero Header Section */}
+      <section className="pt-16 pb-12 md:pt-20 md:pb-16 px-4 sm:px-6 max-w-4xl mx-auto text-center">
+        
+        {/* Simple Pill */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs font-medium text-zinc-300 mb-8">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span>Local video sync • WebRTC voice • 100% private</span>
+        </div>
+
+        {/* Clean, Confident Headline */}
+        <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-white leading-[1.1] max-w-3xl mx-auto font-sans">
+          Watch movies together, <br className="hidden sm:inline" />
+          <span className="text-zinc-400">in perfect sync.</span>
+        </h1>
+
+        {/* Crisp Subtitle */}
+        <p className="mt-5 text-base sm:text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
+          Enjoy your personal video files with friends or a partner. Sub-second synchronization and built-in voice chat — your movies never touch any server.
+        </p>
+
+        {/* Action Buttons */}
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            onClick={onCreateRoom}
+            className="w-full sm:w-auto px-6 py-3 rounded-xl text-sm font-semibold text-black bg-white hover:bg-zinc-200 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+          >
+            <span>Start a Room</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={onJoinRoom}
+            className="w-full sm:w-auto px-6 py-3 rounded-xl text-sm font-medium text-zinc-300 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/[0.15] active:scale-98 transition-all flex items-center justify-center cursor-pointer"
+          >
+            <span>Join with Code</span>
+          </button>
+        </div>
+
+        <p className="mt-3 text-xs text-zinc-500">
+          No registration or uploads required • 100% free
+        </p>
+
       </section>
 
-      {/* How It Works Section */}
-      <section id="how-it-works" className="py-20 bg-zinc-950/60 border-y border-zinc-800/60 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto">
+      {/* Smart Sliding Pictures / Carousel Showcase */}
+      <section className="px-4 sm:px-6 pb-20 max-w-4xl mx-auto w-full">
+        <div className="relative rounded-2xl bg-[#0e0e13] border border-white/[0.08] overflow-hidden shadow-2xl">
+          
+          {/* Slide Content Area */}
+          <div className="grid grid-cols-1 md:grid-cols-2 min-h-[320px]">
+            {/* Left: Text & Info */}
+            <div className="p-6 sm:p-8 flex flex-col justify-between text-left">
+              <div>
+                <span className="text-[11px] font-mono uppercase font-semibold text-zinc-400 block mb-2">
+                  {slides[currentSlide].badge}
+                </span>
+                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-snug">
+                  {slides[currentSlide].title}
+                </h3>
+                <p className="mt-3 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                  {slides[currentSlide].description}
+                </p>
+              </div>
+
+              {/* Slide Controls & Dots */}
+              <div className="mt-6 flex items-center justify-between pt-4 border-t border-white/[0.06]">
+                <div className="flex items-center gap-1.5">
+                  {slides.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentSlide(index)}
+                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                        index === currentSlide ? 'w-6 bg-white' : 'w-1.5 bg-white/20 hover:bg-white/40'
+                      }`}
+                      aria-label={`Go to slide ${index + 1}`}
+                    />
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={prevSlide}
+                    className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                    aria-label="Previous slide"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={nextSlide}
+                    className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                    aria-label="Next slide"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Visual Graphic Preview for Slide */}
+            <div className="bg-[#09090d] border-t md:border-t-0 md:border-l border-white/[0.06] flex items-center justify-center">
+              {slides[currentSlide].visual}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Quick App Install option */}
+        {!isInstalled && onInstallApp && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={onInstallApp}
+              className="inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Install CineMate as standalone App</span>
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* How it Works Section */}
+      <section id="how-it-works" className="py-20 border-t border-white/[0.06] bg-[#0a0a0e]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
               {t('howItWorks.title')}
             </h2>
-            <p className="mt-3 text-sm sm:text-base text-zinc-400 max-w-xl mx-auto">
+            <p className="mt-2 text-sm text-zinc-400">
               {t('howItWorks.subtitle')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 relative">
-              <span className="text-4xl font-black font-mono text-emerald-500/20 mb-3 block">01</span>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
-                <Users className="w-5 h-5" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{t('howItWorks.step1Title')}</h3>
-              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">{t('howItWorks.step1Desc')}</p>
+            <div className="clean-card rounded-2xl p-6 text-left">
+              <span className="text-xs font-mono font-semibold text-zinc-500 block mb-3">01</span>
+              <h3 className="text-base font-semibold text-white mb-2">
+                {t('howItWorks.step1Title')}
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                {t('howItWorks.step1Desc')}
+              </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 relative">
-              <span className="text-4xl font-black font-mono text-emerald-500/20 mb-3 block">02</span>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
-                <FileVideo className="w-5 h-5" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{t('howItWorks.step2Title')}</h3>
-              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">{t('howItWorks.step2Desc')}</p>
+            <div className="clean-card rounded-2xl p-6 text-left">
+              <span className="text-xs font-mono font-semibold text-zinc-500 block mb-3">02</span>
+              <h3 className="text-base font-semibold text-white mb-2">
+                {t('howItWorks.step2Title')}
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                {t('howItWorks.step2Desc')}
+              </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 relative">
-              <span className="text-4xl font-black font-mono text-emerald-500/20 mb-3 block">03</span>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
-                <Heart className="w-5 h-5 fill-emerald-400 text-emerald-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{t('howItWorks.step3Title')}</h3>
-              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">{t('howItWorks.step3Desc')}</p>
+            <div className="clean-card rounded-2xl p-6 text-left">
+              <span className="text-xs font-mono font-semibold text-zinc-500 block mb-3">03</span>
+              <h3 className="text-base font-semibold text-white mb-2">
+                {t('howItWorks.step3Title')}
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                {t('howItWorks.step3Desc')}
+              </p>
             </div>
-          </div>
-
-          <div className="mt-12 p-5 rounded-2xl bg-zinc-900/60 border border-emerald-500/20 flex items-center justify-center gap-3 text-center">
-            <Lock className="w-4 h-4 text-emerald-400 shrink-0" />
-            <p className="text-xs sm:text-sm text-zinc-300 font-medium">
-              {t('howItWorks.privacyNote')}
-            </p>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto">
+      <section id="features" className="py-20 border-t border-white/[0.06]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
               {t('features.title')}
             </h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="p-6 rounded-2xl bg-zinc-900/30 border border-zinc-800 hover:border-emerald-800/40 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
-                <Zap className="w-5 h-5" />
+            
+            <div className="clean-card rounded-2xl p-6 text-left">
+              <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-white mb-4">
+                <Zap className="w-4 h-4" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{t('features.syncTitle')}</h3>
-              <p className="text-sm text-zinc-400 leading-relaxed">{t('features.syncDesc')}</p>
+              <h3 className="text-base font-semibold text-white mb-1.5">
+                {t('features.syncTitle')}
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                {t('features.syncDesc')}
+              </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-zinc-900/30 border border-zinc-800 hover:border-emerald-800/40 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
-                <Mic className="w-5 h-5" />
+            <div className="clean-card rounded-2xl p-6 text-left">
+              <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-white mb-4">
+                <Volume2 className="w-4 h-4" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{t('features.voiceTitle')}</h3>
-              <p className="text-sm text-zinc-400 leading-relaxed">{t('features.voiceDesc')}</p>
+              <h3 className="text-base font-semibold text-white mb-1.5">
+                {t('features.voiceTitle')}
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                {t('features.voiceDesc')}
+              </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-zinc-900/30 border border-zinc-800 hover:border-emerald-800/40 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
-                <ShieldCheck className="w-5 h-5" />
+            <div className="clean-card rounded-2xl p-6 text-left">
+              <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-white mb-4">
+                <ShieldCheck className="w-4 h-4" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{t('features.privacyTitle')}</h3>
-              <p className="text-sm text-zinc-400 leading-relaxed">{t('features.privacyDesc')}</p>
+              <h3 className="text-base font-semibold text-white mb-1.5">
+                {t('features.privacyTitle')}
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                {t('features.privacyDesc')}
+              </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-zinc-900/30 border border-zinc-800 hover:border-emerald-800/40 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
-                <Sparkles className="w-5 h-5" />
+            <div className="clean-card rounded-2xl p-6 text-left">
+              <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-white mb-4">
+                <FileVideo className="w-4 h-4" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{t('features.reactionsTitle')}</h3>
-              <p className="text-sm text-zinc-400 leading-relaxed">{t('features.reactionsDesc')}</p>
+              <h3 className="text-base font-semibold text-white mb-1.5">
+                Custom Subtitles & Formats
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                Load local .SRT or .VTT subtitles, switch aspect ratios (16:9, 21:9 ultrawide), and enjoy full resolution with zero compression.
+              </p>
             </div>
+
           </div>
         </div>
       </section>
 
-      {/* Footer Section */}
-      <footer id="privacy" className="mt-auto border-t border-zinc-800/80 py-12 bg-zinc-950 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex flex-col items-center md:items-start text-center md:text-left">
-            <div className="flex items-center gap-2 mb-2">
-              <Heart className="w-4 h-4 text-emerald-500 fill-emerald-500" />
-              <span className="text-base font-bold text-white tracking-tight">CineMate</span>
-            </div>
-            <p className="text-xs text-zinc-400 max-w-sm">
-              {t('footer.description')}
-            </p>
-            <p className="text-[11px] text-zinc-500 mt-2 max-w-md">
-              {t('footer.privacyStatement')}
-            </p>
+      {/* Simple Call to Action */}
+      <section className="py-16 border-t border-white/[0.06] bg-[#0a0a0e] text-center px-4">
+        <div className="max-w-xl mx-auto">
+          <h2 className="text-2xl font-bold text-white tracking-tight">
+            Ready to watch together?
+          </h2>
+          <p className="mt-2 text-sm text-zinc-400">
+            Create a private room in seconds and share the code with your partner.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <button
+              onClick={onCreateRoom}
+              className="px-6 py-3 rounded-xl text-sm font-semibold text-black bg-white hover:bg-zinc-200 active:scale-98 transition-all cursor-pointer shadow-sm"
+            >
+              Start a Room Now
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Clean Minimal Footer */}
+      <footer id="privacy" className="mt-auto border-t border-white/[0.06] py-10 bg-[#08080a] px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-white">CineMate</span>
+            <span className="text-xs text-zinc-500">•</span>
+            <span className="text-xs text-zinc-500">{t('footer.description')}</span>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             <LanguageSelector />
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto mt-8 pt-6 border-t border-zinc-900 text-center">
-          <p className="text-[11px] text-zinc-600">
-            {t('footer.copyright')}
+        <div className="max-w-5xl mx-auto mt-6 pt-4 border-t border-white/[0.04] text-center sm:text-left">
+          <p className="text-[11px] text-zinc-500">
+            {t('footer.privacyStatement')}
           </p>
         </div>
       </footer>
+
     </div>
   );
 };

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-  Heart, 
   Users, 
   Settings as SettingsIcon, 
   Share2, 
@@ -28,6 +27,7 @@ import { VoiceControls } from './VoiceControls.js';
 import { SettingsModal } from './SettingsModal.js';
 import { InviteModal } from './InviteModal.js';
 import { ReactionOverlay } from './ReactionOverlay.js';
+import { Logo } from './Logo.js';
 
 interface WatchRoomProps {
   roomId: string;
@@ -267,66 +267,54 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
   const participantCount = room?.participants.length || 1;
 
   return (
-    <div className="flex flex-col h-screen max-h-screen bg-[#06120e] text-zinc-100 overflow-hidden">
+    <div className="flex flex-col h-screen max-h-screen bg-[#08080a] text-zinc-100 overflow-hidden font-sans">
       {/* Header */}
-      <header className="h-14 cinema-surface border-b border-emerald-950/60 px-2.5 sm:px-6 flex items-center justify-between shrink-0 z-40">
+      <header className="h-14 bg-[#0c0c10]/90 backdrop-blur-md border-b border-white/[0.06] px-2.5 sm:px-6 flex items-center justify-between shrink-0 z-40">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={handleLeaveConfirm}>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-              <Heart className="w-4 h-4 text-emerald-400 fill-emerald-400" />
-            </div>
-            <span className="font-bold text-sm tracking-tight hidden md:inline text-white">
-              CineMate
-            </span>
-          </div>
+          <Logo size="sm" onClick={handleLeaveConfirm} />
 
           <span className="text-zinc-600 hidden md:inline">•</span>
 
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <h2 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate max-w-[120px] xs:max-w-[180px] sm:max-w-xs">
-              {room?.name || 'Movie Night 💚'}
+              {room?.name || 'Movie Night'}
             </h2>
           </div>
         </div>
 
         {/* Right Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-          {/* Partner Speaking Indicator (When someone else is talking) */}
+          {/* Partner Speaking Indicator */}
           {partnerIsSpeaking && (
-            <div className="inline-flex items-center gap-1.5 h-8 px-2 sm:px-2.5 rounded-lg bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-xs font-semibold animate-pulse shadow-md shadow-emerald-950/40">
-              <Volume2 className="w-3.5 h-3.5 shrink-0 text-emerald-400 animate-bounce" />
+            <div className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-white/10 border border-white/20 text-white text-xs font-medium animate-pulse">
+              <Volume2 className="w-3.5 h-3.5 shrink-0 text-white" />
               <span className="truncate max-w-[90px] sm:max-w-[130px]">
                 {partnerName || 'Partner'}
               </span>
             </div>
           )}
 
-          {/* Quick Voice Mute / Unmute Symbol (Always available without tabs) */}
+          {/* Quick Voice Mute / Unmute */}
           {room?.settings.voiceChat && (
             <button
               type="button"
               onClick={toggleMute}
               className={`inline-flex items-center justify-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg font-semibold text-xs transition-all cursor-pointer select-none active:scale-95 ${
                 isMuted
-                  ? 'bg-zinc-900/90 hover:bg-zinc-800 text-rose-400 border border-rose-900/50 hover:border-rose-700/60 shadow-sm'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950/40 ring-1 ring-emerald-400/40'
+                  ? 'bg-zinc-900 text-zinc-400 border border-white/10 hover:text-white'
+                  : 'bg-white hover:bg-zinc-200 text-black shadow-sm'
               }`}
               title={isMuted ? t('voice.unmute') : t('voice.mute')}
               aria-label={isMuted ? t('voice.unmute') : t('voice.mute')}
             >
               {isMuted ? (
                 <>
-                  <MicOff className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                  <MicOff className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
                   <span className="hidden sm:inline font-medium">{t('voice.mute')}</span>
                 </>
               ) : (
                 <>
-                  <div className="relative">
-                    <Mic className="w-3.5 h-3.5 shrink-0 text-white" />
-                    {isSpeakingLocally && (
-                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white animate-ping" />
-                    )}
-                  </div>
+                  <Mic className="w-3.5 h-3.5 shrink-0 text-black" />
                   <span className="hidden sm:inline font-medium">
                     {isSpeakingLocally ? t('voice.speaking') : t('voice.title')}
                   </span>
@@ -337,7 +325,7 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
 
           {/* Connection Status Badge */}
           <div 
-            className="inline-flex items-center justify-center h-8 px-2 sm:px-2.5 rounded-lg bg-zinc-900/90 border border-emerald-900/30 text-[11px] font-medium text-zinc-300"
+            className="inline-flex items-center justify-center h-8 px-2 sm:px-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[11px] font-medium text-zinc-300"
             title={
               connectionStatus === 'CONNECTED'
                 ? t('room.connected')
@@ -349,7 +337,7 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 connectionStatus === 'CONNECTED'
-                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                  ? 'bg-emerald-400'
                   : connectionStatus === 'CONNECTING'
                   ? 'bg-amber-400 animate-pulse'
                   : 'bg-rose-500'
@@ -365,8 +353,8 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           </div>
 
           {/* Online count */}
-          <div className="inline-flex items-center justify-center gap-1.5 h-8 px-2 sm:px-2.5 rounded-lg bg-zinc-900/90 border border-emerald-900/30 text-[11px] font-medium text-zinc-300">
-            <Users className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <div className="inline-flex items-center justify-center gap-1.5 h-8 px-2 sm:px-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[11px] font-medium text-zinc-300">
+            <Users className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <span>{participantCount}</span>
             <span className="hidden sm:inline">{t('room.online')}</span>
           </div>
@@ -375,7 +363,7 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           <button
             type="button"
             onClick={() => setIsInviteOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow-md shadow-emerald-950/40 active:scale-95 transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg bg-white hover:bg-zinc-200 text-xs font-semibold text-black active:scale-95 transition-all cursor-pointer shadow-sm"
           >
             <Share2 className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden xs:inline">{t('room.invite')}</span>
@@ -385,7 +373,7 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 hover:border-emerald-800/40 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white border border-white/[0.08] transition-colors cursor-pointer"
             aria-label={t('room.settings')}
           >
             <SettingsIcon className="w-4 h-4 shrink-0" />
@@ -395,7 +383,7 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           <button
             type="button"
             onClick={handleLeaveConfirm}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/90 hover:bg-rose-950/40 text-zinc-400 hover:text-rose-400 border border-zinc-800 hover:border-rose-900/50 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.04] hover:bg-red-500/20 text-zinc-400 hover:text-red-400 border border-white/[0.08] transition-colors cursor-pointer"
             title={t('room.leave')}
           >
             <LogOut className="w-4 h-4 shrink-0" />

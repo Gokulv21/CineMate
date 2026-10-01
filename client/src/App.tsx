@@ -92,7 +92,7 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#06120e] text-zinc-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
+    <div className="min-h-screen bg-[#08080a] text-zinc-100 flex flex-col font-sans selection:bg-white/20 selection:text-white">
       <Navbar
         onCreateRoom={() => setIsCreateOpen(true)}
         onJoinRoom={() => setIsJoinOpen(true)}

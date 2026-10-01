@@ -2,115 +2,101 @@
 
 @layer base {
   :root {
-    --background: 160 50% 3%;
+    --background: 240 10% 4%;
     --foreground: 0 0% 98%;
-    --card: 160 40% 5%;
+    --card: 240 10% 6%;
     --card-foreground: 0 0% 98%;
-    --popover: 160 40% 5%;
+    --popover: 240 10% 6%;
     --popover-foreground: 0 0% 98%;
-    --primary: 158 64% 52%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 160 20% 10%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 10% 4%;
+    --secondary: 240 6% 12%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 160 15% 12%;
-    --muted-foreground: 160 15% 65%;
-    --accent: 158 64% 50%;
+    --muted: 240 6% 15%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 6% 15%;
     --accent-foreground: 0 0% 98%;
-    --border: 160 20% 14%;
+    --border: 240 6% 15%;
     --radius: 0.75rem;
   }
 
   * {
-    border-color: #162a20;
+    border-color: rgba(255, 255, 255, 0.08);
     box-sizing: border-box;
   }
 
   body {
-    background-color: #06120e;
-    color: #f3f4f6;
-    font-family: 'Inter', 'Noto Sans JP', 'Noto Sans Tamil', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #08080a;
+    color: #f4f4f5;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
     padding: 0;
+    overflow-x: hidden;
   }
 }
 
-/* Custom Cinema Scrollbar */
+/* Minimal Sleek Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(10, 24, 18, 0.6);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(16, 185, 129, 0.25);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(16, 185, 129, 0.45);
+  background: rgba(255, 255, 255, 0.28);
 }
 
-/* Glass and Cinema Surfaces */
+/* Clean Surfaces */
 .cinema-surface {
-  background-color: rgba(9, 23, 17, 0.85);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(16, 185, 129, 0.12);
+  background-color: rgba(12, 12, 16, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.cinema-glow {
-  box-shadow: 0 0 50px -10px rgba(16, 185, 129, 0.25);
+.clean-card {
+  background-color: rgba(18, 18, 22, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.cinema-screen-shadow {
-  box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px -5px rgba(16, 185, 129, 0.15);
+.clean-card:hover {
+  background-color: rgba(24, 24, 30, 0.8);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* Interactive Slider styling */
+/* Interactive Slider */
 input[type="range"] {
-  accent-color: #10b981;
+  accent-color: #ffffff;
 }
 
 @keyframes float-up {
   0% {
-    transform: translateY(0) scale(0.8) rotate(0deg);
+    transform: translateY(0) scale(0.9);
     opacity: 1;
   }
-  50% {
-    transform: translateY(-80px) scale(1.2) rotate(-8deg);
-    opacity: 0.9;
-  }
   100% {
-    transform: translateY(-160px) scale(1) rotate(6deg);
+    transform: translateY(-80px) scale(1.1);
     opacity: 0;
   }
 }
 
 .animate-float-up {
-  animation: float-up 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: float-up 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
-@keyframes pulse-subtle {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.animate-pulse-subtle {
-  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Cinema Subtitle Styling */
+/* Clean Subtitle Styling */
 video::cue {
   background-color: rgba(0, 0, 0, 0.85);
-  color: #f3f4f6;
-  font-family: 'Inter', system-ui, sans-serif;
+  color: #ffffff;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   font-size: 1.1rem;
   line-height: 1.4;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 3px 8px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
 }

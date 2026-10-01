@@ -14,7 +14,6 @@ import {
   RotateCcw, 
   RotateCw, 
   Lock, 
-  Sparkles, 
   Scaling, 
   Heart, 
   Check, 
@@ -1253,7 +1252,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           ? 'fixed z-[9999] rounded-none border-0 overflow-hidden shadow-2xl'
           : isFullscreen
           ? 'fixed inset-0 z-50 rounded-none border-0 aspect-auto w-screen h-screen'
-          : 'relative w-full h-full overflow-hidden shadow-2xl cinema-screen-shadow border border-emerald-950/40 group aspect-video'
+          : 'relative w-full h-full overflow-hidden shadow-2xl rounded-2xl border border-white/10 group aspect-video'
       }`}
       style={
         isRotatedLandscape
@@ -1285,9 +1284,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <div className="flex flex-col items-center justify-center p-8 text-center max-w-md animate-in fade-in zoom-in-95 duration-200">
           <div 
             onClick={() => fileInputRef.current?.click()}
-            className="w-20 h-20 rounded-2xl bg-[#091a13] border-2 border-dashed border-emerald-800/60 hover:border-emerald-500 flex items-center justify-center mb-5 cursor-pointer group/pick transition-all hover:bg-[#0c241b] shadow-xl"
+            className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-dashed border-white/20 hover:border-white/40 flex items-center justify-center mb-4 cursor-pointer group/pick transition-all hover:bg-white/[0.08]"
           >
-            <Film className="w-10 h-10 text-emerald-400/70 group-hover/pick:text-emerald-400 group-hover/pick:scale-110 transition-all" />
+            <Film className="w-7 h-7 text-zinc-400 group-hover/pick:text-white transition-all" />
           </div>
           
           <h3 className="text-xl font-bold text-white tracking-tight">
@@ -1300,7 +1299,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="mt-6 px-6 py-3 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+            className="mt-6 px-6 py-2.5 rounded-xl font-semibold text-xs text-black bg-white hover:bg-zinc-200 shadow-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
           >
             <Upload className="w-4 h-4" />
             <span>{t('video.chooseFileButton')}</span>
@@ -1363,31 +1362,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             className="hidden"
           />
 
-          {/* MKV CODEC NOTICE: Informs user if an MKV file cannot decode video frames or multi-audio */}
+          {/* MKV CODEC NOTICE */}
           {fileName.toLowerCase().endsWith('.mkv') && !dismissMkvNotice && (
-            <div className="absolute top-16 inset-x-3 sm:inset-x-8 z-40 p-3 sm:p-4 rounded-xl bg-black/90 border border-emerald-500/50 backdrop-blur-md flex items-start justify-between shadow-2xl animate-in slide-in-from-top-3">
+            <div className="absolute top-16 inset-x-3 sm:inset-x-8 z-40 p-3 sm:p-4 rounded-xl bg-[#111116]/95 border border-white/10 backdrop-blur-md flex items-start justify-between shadow-2xl animate-in slide-in-from-top-3">
               <div className="flex items-start gap-2.5 sm:gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0 mt-0.5">
-                  <Film className="w-4 h-4 text-emerald-400" />
+                <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center shrink-0 mt-0.5">
+                  <Film className="w-4 h-4 text-white" />
                 </div>
                 <div className="text-left">
                   <p className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
                     <span>MKV Format Notice</span>
-                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/60">.mkv</span>
+                    <span className="text-[10px] font-mono text-zinc-300 bg-white/10 px-2 py-0.5 rounded-full border border-white/15">.mkv</span>
                   </p>
                   <p className="text-[11px] sm:text-xs text-zinc-300 leading-relaxed mt-1">
                     Browsers natively play <strong>MP4 (H.264 / AAC)</strong>. 
                     If this movie shows a black screen, it uses HEVC (H.265) video. If it plays in Hindi instead of Tamil, browsers automatically play the 1st audio stream in MKVs.
                   </p>
-                  <p className="text-[11px] text-emerald-300 font-semibold mt-1.5">
-                    💡 Tip: Click the Languages (🌐) button below to load a Tamil audio track (.m4a/.mp3), or convert the MKV to MP4 with VLC/HandBrake.
+                  <p className="text-[11px] text-zinc-400 font-medium mt-1.5">
+                    💡 Tip: Click the Languages (🌐) button below to load an audio track, or convert the MKV to MP4.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setDismissMkvNotice(true)}
-                className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors cursor-pointer shrink-0 ml-2"
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-zinc-300 text-xs font-medium transition-colors cursor-pointer shrink-0 ml-2"
               >
                 Dismiss
               </button>
@@ -1396,9 +1395,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
           {/* LOADING / BUFFERING SPINNER (Large video files) */}
           {(isLoadingVideo || isBuffering) && !videoErrorMessage && (
-            <div className="absolute inset-0 z-35 flex flex-col items-center justify-center bg-black/55 backdrop-blur-xs pointer-events-none animate-in fade-in duration-200">
-              <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-400 animate-spin mb-3 shadow-lg shadow-emerald-950/80" />
-              <span className="text-xs font-semibold text-emerald-300 tracking-wide font-mono">
+            <div className="absolute inset-0 z-35 flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs pointer-events-none animate-in fade-in duration-200">
+              <div className="w-10 h-10 rounded-full border-3 border-white/20 border-t-white animate-spin mb-3 shadow-lg" />
+              <span className="text-xs font-semibold text-white tracking-wide font-mono">
                 {isLoadingVideo ? 'Loading movie...' : 'Buffering...'}
               </span>
               {isLoadingVideo && (
@@ -1412,7 +1411,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           {/* ERROR BANNER FOR UNSUPPORTED CODECS (MKV / HEVC / AC3) */}
           {videoErrorMessage && (
             <div className="absolute inset-0 z-40 flex flex-col items-center justify-center p-6 text-center bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
-              <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center mb-3 text-rose-400 shadow-xl shadow-rose-950/50">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center mb-3 text-rose-400 shadow-xl">
                 <AlertTriangle className="w-7 h-7" />
               </div>
               <h3 className="text-base sm:text-lg font-bold text-white mb-2 max-w-md">
@@ -1425,7 +1424,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer active:scale-95"
+                  className="px-5 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                 >
                   <Upload className="w-4 h-4" />
                   <span>Choose MP4 Video</span>
@@ -1433,7 +1432,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <button
                   type="button"
                   onClick={() => setVideoErrorMessage(null)}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-zinc-300 text-xs font-medium transition-colors cursor-pointer"
                 >
                   Dismiss
                 </button>
@@ -1441,12 +1440,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </div>
           )}
 
-          {/* PRESS AND HOLD 2X SPEED INDICATOR (YouTube / MX Player style) */}
+          {/* PRESS AND HOLD 2X SPEED INDICATOR */}
           {isPressAndHold2x && (
             <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/85 border border-emerald-400/70 shadow-2xl shadow-emerald-500/40 backdrop-blur-xl">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                <span className="text-xs font-bold font-mono tracking-wider text-emerald-300">
+              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/85 border border-white/20 shadow-2xl backdrop-blur-xl">
+                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                <span className="text-xs font-bold font-mono tracking-wider text-white">
                   2X SPEED ⏩
                 </span>
               </div>
@@ -1456,8 +1455,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           {/* DOUBLE TAP RIPPLE FEEDBACK: LEFT (-10s) */}
           {doubleTapFeedback === 'left' && (
             <div className="absolute inset-y-0 left-0 w-1/2 flex items-center justify-center pointer-events-none z-35 animate-in fade-in zoom-in-90 duration-200">
-              <div className="flex flex-col items-center justify-center p-5 rounded-full bg-black/75 border border-emerald-400/60 text-emerald-300 backdrop-blur-md shadow-2xl shadow-emerald-950/80">
-                <RotateCcw className="w-8 h-8 text-emerald-400 animate-pulse" />
+              <div className="flex flex-col items-center justify-center p-5 rounded-full bg-black/75 border border-white/20 text-white backdrop-blur-md shadow-2xl">
+                <RotateCcw className="w-7 h-7 text-white" />
                 <span className="text-xs font-bold font-mono mt-1 text-white">-10s</span>
               </div>
             </div>
@@ -1466,8 +1465,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           {/* DOUBLE TAP RIPPLE FEEDBACK: RIGHT (+10s) */}
           {doubleTapFeedback === 'right' && (
             <div className="absolute inset-y-0 right-0 w-1/2 flex items-center justify-center pointer-events-none z-35 animate-in fade-in zoom-in-90 duration-200">
-              <div className="flex flex-col items-center justify-center p-5 rounded-full bg-black/75 border border-emerald-400/60 text-emerald-300 backdrop-blur-md shadow-2xl shadow-emerald-950/80">
-                <RotateCw className="w-8 h-8 text-emerald-400 animate-pulse" />
+              <div className="flex flex-col items-center justify-center p-5 rounded-full bg-black/75 border border-white/20 text-white backdrop-blur-md shadow-2xl">
+                <RotateCw className="w-7 h-7 text-white" />
                 <span className="text-xs font-bold font-mono mt-1 text-white">+10s</span>
               </div>
             </div>
@@ -1489,7 +1488,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </div>
               <button
                 onClick={() => setDismissMismatch(true)}
-                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-medium transition-colors"
+                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-medium transition-colors cursor-pointer"
               >
                 {t('video.dismissWarning')}
               </button>
@@ -1499,8 +1498,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           {/* Finished Overlay */}
           {isEnded && (
             <div className="absolute inset-0 z-40 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
-              <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mb-3">
-                <Sparkles className="w-7 h-7 text-emerald-400" />
+              <div className="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center mb-3">
+                <Check className="w-6 h-6 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-white tracking-tight">
                 {t('video.finishedTitle')}
@@ -1513,7 +1512,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 {canControl && (
                   <button
                     onClick={onReplay}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>{t('video.replay')}</span>
@@ -1549,11 +1548,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     e.stopPropagation();
                     handleExitFullscreen();
                   }}
-                  className="p-1.5 sm:p-2 rounded-xl bg-zinc-900/80 hover:bg-emerald-950/60 text-white border border-emerald-900/40 hover:border-emerald-600/60 flex items-center gap-1.5 transition-all cursor-pointer shadow-lg active:scale-95 shrink-0"
+                  className="p-1.5 sm:p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-white border border-white/10 flex items-center gap-1.5 transition-all cursor-pointer shadow-lg active:scale-95 shrink-0"
                   aria-label="Back"
                   title="Back (Exit Fullscreen / Landscape)"
                 >
-                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   <span className="text-xs font-semibold text-zinc-200 hidden xs:inline">Back</span>
                 </button>
               )}
@@ -1561,14 +1560,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <span className="text-xs sm:text-sm font-semibold text-white tracking-tight truncate max-w-[110px] xs:max-w-[180px] sm:max-w-md">
                 {fileName}
               </span>
-              <span className="text-[10px] font-mono text-emerald-300 bg-zinc-950/80 px-2 py-0.5 rounded-md border border-emerald-900/40 shrink-0">
+              <span className="text-[10px] font-mono text-zinc-300 bg-white/10 px-2 py-0.5 rounded-md border border-white/10 shrink-0">
                 {formatTime(duration)}
               </span>
 
               {/* Partner is speaking badge in top HUD */}
               {partnerIsSpeaking && (
-                <div className="hidden xs:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-[10px] sm:text-xs font-semibold animate-pulse shadow-md shrink-0">
-                  <Volume2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 animate-bounce" />
+                <div className="hidden xs:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/10 border border-white/20 text-white text-[10px] sm:text-xs font-semibold animate-pulse shadow-md shrink-0">
+                  <Volume2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white animate-bounce" />
                   <span className="truncate max-w-[80px] sm:max-w-[110px]">{partnerName || 'Partner'}</span>
                 </div>
               )}
@@ -1586,20 +1585,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   }}
                   className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 shrink-0 ${
                     isVoiceMuted
-                      ? 'bg-zinc-900/80 hover:bg-zinc-800 text-rose-400 border-rose-900/50'
-                      : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-950'
+                      ? 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 border-white/10'
+                      : 'bg-white hover:bg-zinc-200 text-black border-white shadow-sm'
                   }`}
                   title={isVoiceMuted ? 'Unmute Microphone' : 'Mute Microphone'}
                 >
                   {isVoiceMuted ? (
-                    <MicOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" />
+                    <MicOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-400" />
                   ) : (
-                    <div className="relative">
-                      <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-                      {isSpeakingLocally && (
-                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white animate-ping" />
-                      )}
-                    </div>
+                    <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black" />
                   )}
                   <span className="text-[11px] font-semibold hidden md:inline">
                     {isVoiceMuted ? 'Unmute' : isSpeakingLocally ? 'Speaking' : 'Mic'}
@@ -1617,15 +1611,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   }}
                   className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 shrink-0 ${
                     isChatOpen
-                      ? 'bg-emerald-600 text-white border-emerald-400'
-                      : 'bg-zinc-900/80 hover:bg-emerald-950/60 text-zinc-300 hover:text-white border-emerald-900/40 hover:border-emerald-600/60'
+                      ? 'bg-white text-black border-white'
+                      : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white border-white/10'
                   }`}
                   title="Open Live Chat"
                 >
-                  <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+                  <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="text-[11px] font-semibold hidden md:inline">Chat</span>
                   {messages && messages.length > 0 && (
-                    <span className="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.2 rounded-full border border-emerald-800/60 font-mono">
+                    <span className="text-[9px] bg-white/20 px-1.5 py-0.2 rounded-full font-mono">
                       {messages.length}
                     </span>
                   )}
@@ -1639,10 +1633,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     e.stopPropagation();
                     setShowFitMenu(prev => !prev);
                   }}
-                  className="text-xs text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-emerald-900/40 hover:border-emerald-600/60 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
+                  className="text-xs text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
                   title="Aspect Ratio & Fit Mode"
                 >
-                  <Scaling className="w-3.5 h-3.5 text-emerald-400" />
+                  <Scaling className="w-3.5 h-3.5 text-zinc-300" />
                   <span className="font-semibold">{currentFitOption.iconLabel}</span>
                 </button>
 
@@ -1711,10 +1705,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 triggerSkip('left');
               }}
               disabled={!canControl}
-              className="pointer-events-auto w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-black/60 hover:bg-emerald-950/60 border border-emerald-900/40 hover:border-emerald-600/60 text-zinc-200 hover:text-white flex flex-col items-center justify-center backdrop-blur-md transition-all active:scale-90 cursor-pointer shadow-xl disabled:opacity-30 disabled:cursor-not-allowed"
+              className="pointer-events-auto w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-black/60 hover:bg-white/10 border border-white/15 text-zinc-200 hover:text-white flex flex-col items-center justify-center backdrop-blur-md transition-all active:scale-90 cursor-pointer shadow-xl disabled:opacity-30 disabled:cursor-not-allowed"
               title="Rewind 10 seconds"
             >
-              <RotateCcw className="w-5 h-5 text-emerald-400" />
+              <RotateCcw className="w-5 h-5 text-white" />
               <span className="text-[9px] font-bold text-zinc-300 -mt-0.5">10</span>
             </button>
 
@@ -1727,13 +1721,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 resetControlsTimeout();
               }}
               disabled={!canControl}
-              className="pointer-events-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-600/90 hover:bg-emerald-500 text-white border-2 border-emerald-400/60 flex items-center justify-center shadow-2xl shadow-emerald-950/80 backdrop-blur-md transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105"
+              className="pointer-events-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
-                <Pause className="w-7 h-7 sm:w-9 sm:h-9 fill-white" />
+                <Pause className="w-7 h-7 sm:w-8 sm:h-8 fill-black" />
               ) : (
-                <Play className="w-7 h-7 sm:w-9 sm:h-9 fill-white ml-1" />
+                <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-black ml-1" />
               )}
             </button>
 
@@ -1745,15 +1739,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 triggerSkip('right');
               }}
               disabled={!canControl}
-              className="pointer-events-auto w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-black/60 hover:bg-emerald-950/60 border border-emerald-900/40 hover:border-emerald-600/60 text-zinc-200 hover:text-white flex flex-col items-center justify-center backdrop-blur-md transition-all active:scale-90 cursor-pointer shadow-xl disabled:opacity-30 disabled:cursor-not-allowed"
+              className="pointer-events-auto w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-black/60 hover:bg-white/10 border border-white/15 text-zinc-200 hover:text-white flex flex-col items-center justify-center backdrop-blur-md transition-all active:scale-90 cursor-pointer shadow-xl disabled:opacity-30 disabled:cursor-not-allowed"
               title="Forward 10 seconds"
             >
-              <RotateCw className="w-5 h-5 text-emerald-400" />
+              <RotateCw className="w-5 h-5 text-white" />
               <span className="text-[9px] font-bold text-zinc-300 -mt-0.5">10</span>
             </button>
           </div>
 
-          {/* BOTTOM CONTROLS HUD (Slides up on click, auto-hides) */}
+          {/* BOTTOM CONTROLS HUD */}
           <div
             onPointerDown={(e) => e.stopPropagation()}
             onPointerUp={(e) => e.stopPropagation()}
@@ -1774,15 +1768,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               {hoverTime !== null && (
                 <div
                   style={{ left: `${hoverX}px` }}
-                  className="absolute -top-7 -translate-x-1/2 bg-zinc-950 text-emerald-300 text-[10px] font-mono px-2 py-0.5 rounded border border-emerald-900/60 shadow-md pointer-events-none whitespace-nowrap"
+                  className="absolute -top-7 -translate-x-1/2 bg-zinc-900 text-white text-[10px] font-mono px-2 py-0.5 rounded border border-white/15 shadow-md pointer-events-none whitespace-nowrap"
                 >
                   {formatTime(hoverTime)}
                 </div>
               )}
 
-              <div className="w-full h-1.5 group-hover/scrub:h-2 bg-zinc-800/80 rounded-full transition-all overflow-hidden relative">
+              <div className="w-full h-1.5 group-hover/scrub:h-2 bg-white/20 rounded-full transition-all overflow-hidden relative">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full"
+                  className="h-full bg-white rounded-full"
                   style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
                 />
               </div>
@@ -1812,13 +1806,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
                 {!canControl && (
                   <div className="hidden md:flex items-center gap-1 text-[10px] text-zinc-400 bg-zinc-900/80 px-1.5 py-0.5 rounded border border-zinc-800">
-                    <Lock className="w-3 h-3 text-emerald-400" />
+                    <Lock className="w-3 h-3 text-zinc-400" />
                     <span className="hidden lg:inline">{t('video.hostOnlyControl')}</span>
                   </div>
                 )}
               </div>
 
-              {/* Right: Quick Reaction 💚, Volume, Speed, CC, Audio, Rotate, Fullscreen */}
+              {/* Right: Quick Reaction, Volume, Speed, CC, Audio, Rotate, Fullscreen */}
               <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto" data-interactive="true" onClick={(e) => e.stopPropagation()}>
                 {/* Send Reactions inside controls HUD */}
                 {reactionsEnabled && onSendReaction && (
@@ -1832,21 +1826,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                       }}
                       className={`p-1 sm:p-1.5 rounded-lg border transition-all flex items-center gap-1 active:scale-125 cursor-pointer shrink-0 ${
                         showQuickReactions
-                          ? 'bg-emerald-600 text-white border-emerald-400'
-                          : 'bg-emerald-950/50 hover:bg-emerald-900/50 border-emerald-800/40 text-emerald-400 hover:text-emerald-300'
+                          ? 'bg-white text-black border-white'
+                          : 'bg-white/[0.06] hover:bg-white/[0.12] border-white/10 text-zinc-300 hover:text-white'
                       }`}
                       title="Send Reaction"
                     >
-                      <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-emerald-400 text-emerald-400" />
+                      <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                       <span className="text-[10px] sm:text-[11px] font-semibold hidden md:inline">React</span>
                     </button>
 
                     {showQuickReactions && (
                       <div
                         onClick={(e) => e.stopPropagation()}
-                        className="absolute bottom-full mb-2 left-0 sm:left-auto sm:right-0 bg-zinc-950/95 border border-emerald-900/60 shadow-2xl rounded-2xl p-1.5 backdrop-blur-xl flex items-center gap-1 z-50 animate-in fade-in zoom-in-95"
+                        className="absolute bottom-full mb-2 left-0 sm:left-auto sm:right-0 bg-[#111116] border border-white/10 shadow-2xl rounded-2xl p-1.5 backdrop-blur-xl flex items-center gap-1 z-50 animate-in fade-in zoom-in-95"
                       >
-                        {['💚', '❤️', '😂', '🔥', '👏', '🍿', '😮'].map((emoji) => (
+                        {['❤️', '🍿', '😂', '🔥', '👏', '😮'].map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
@@ -1855,7 +1849,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                               setShowQuickReactions(false);
                               resetControlsTimeout();
                             }}
-                            className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-base sm:text-lg hover:bg-zinc-800/80 rounded-xl active:scale-125 transition-transform cursor-pointer"
+                            className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-base sm:text-lg hover:bg-white/[0.08] rounded-xl active:scale-125 transition-transform cursor-pointer"
                           >
                             {emoji}
                           </button>
@@ -1874,7 +1868,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     aria-label="Toggle mute"
                   >
                     {isMuted || volume === 0 ? (
-                      <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+                      <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                     ) : (
                       <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     )}
@@ -1896,7 +1890,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   <select
                     value={playbackRate}
                     onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-                    className="bg-zinc-900/90 hover:bg-zinc-800 text-[10px] sm:text-[11px] font-mono font-medium text-zinc-300 px-1 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg border border-zinc-700/60 focus:outline-none cursor-pointer"
+                    className="bg-zinc-900/90 hover:bg-zinc-800 text-[10px] sm:text-[11px] font-mono font-medium text-zinc-300 px-1 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg border border-white/10 focus:outline-none cursor-pointer"
                     aria-label="Playback speed"
                   >
                     <option value={0.5}>0.5x</option>
@@ -1920,15 +1914,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     }}
                     className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 shrink-0 ${
                       selectedSubtitle
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                        ? 'bg-white/15 text-white border border-white/25 shadow-sm'
+                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
                     }`}
                     aria-label="Subtitles & Captions"
                     title="Subtitles & Captions (CC)"
                   >
                     <Captions className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     {selectedSubtitle && (
-                      <span className="text-[8px] sm:text-[9px] font-bold text-emerald-300">CC</span>
+                      <span className="text-[8px] sm:text-[9px] font-bold text-white">CC</span>
                     )}
                   </button>
 
@@ -1936,11 +1930,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   {showSubtitleMenu && (
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="absolute right-0 bottom-full mb-2 w-52 sm:w-56 rounded-xl bg-zinc-950/95 border border-emerald-900/60 shadow-2xl backdrop-blur-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+                      className="absolute right-0 bottom-full mb-2 w-52 sm:w-56 rounded-xl bg-[#111116] border border-white/10 shadow-2xl backdrop-blur-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
                     >
-                      <div className="px-3 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-zinc-800/80 flex items-center justify-between">
+                      <div className="px-3 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-white/[0.06] flex items-center justify-between">
                         <span>Subtitles / Captions</span>
-                        <span className="text-emerald-400 font-mono text-[9px]">{subtitles.length} available</span>
+                        <span className="text-zinc-400 font-mono text-[9px]">{subtitles.length} available</span>
                       </div>
 
                       <div className="max-h-48 overflow-y-auto py-1">

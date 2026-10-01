@@ -25,24 +25,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-sm bg-[#111116] border border-white/10 rounded-2xl p-6 shadow-2xl text-left">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors"
+          className="absolute top-4 right-4 p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/[0.06] transition-colors cursor-pointer"
           aria-label={t('settings.close')}
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-            <Sliders className="w-5 h-5 text-emerald-400" />
+          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+            <Sliders className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white tracking-tight">
+            <h3 className="text-base font-semibold text-white tracking-tight">
               {t('settings.title')}
             </h3>
             {!isHost && (
@@ -53,9 +53,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
-            <label className="block text-xs font-semibold text-zinc-300 mb-2">
+        <div className="space-y-3">
+          <div className="p-3 rounded-xl bg-zinc-900 border border-white/[0.06]">
+            <label className="block text-xs font-medium text-zinc-300 mb-2">
               {t('settings.playbackControl')}
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -63,10 +63,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 type="button"
                 disabled={!isHost}
                 onClick={() => onUpdateSettings({ playbackControl: 'HOST_ONLY' })}
-                className={`py-2 px-3 rounded-lg text-xs font-medium border text-center transition-all ${
+                className={`py-2 px-3 rounded-lg text-xs font-semibold text-center transition-all ${
                   settings.playbackControl === 'HOST_ONLY'
-                    ? 'bg-emerald-500/15 border-emerald-500/60 text-emerald-300'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-black shadow-sm'
+                    : 'bg-zinc-800 text-zinc-400 hover:text-white'
                 } ${!isHost && 'opacity-60 cursor-not-allowed'}`}
               >
                 {t('settings.hostOnly')}
@@ -75,10 +75,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 type="button"
                 disabled={!isHost}
                 onClick={() => onUpdateSettings({ playbackControl: 'EVERYONE' })}
-                className={`py-2 px-3 rounded-lg text-xs font-medium border text-center transition-all ${
+                className={`py-2 px-3 rounded-lg text-xs font-semibold text-center transition-all ${
                   settings.playbackControl === 'EVERYONE'
-                    ? 'bg-emerald-500/15 border-emerald-500/60 text-emerald-300'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white text-black shadow-sm'
+                    : 'bg-zinc-800 text-zinc-400 hover:text-white'
                 } ${!isHost && 'opacity-60 cursor-not-allowed'}`}
               >
                 {t('settings.everyone')}
@@ -86,11 +86,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-white/[0.06]">
             <div className="flex items-center gap-2.5">
-              <Zap className="w-4 h-4 text-emerald-400" />
+              <Zap className="w-4 h-4 text-white" />
               <div>
-                <p className="text-xs font-semibold text-zinc-200">{t('settings.autoSync')}</p>
+                <p className="text-xs font-medium text-zinc-200">{t('settings.autoSync')}</p>
                 <p className="text-[10px] text-zinc-500">Auto speed & seek alignment</p>
               </div>
             </div>
@@ -99,63 +99,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               disabled={!isHost}
               checked={settings.autoSync}
               onChange={(e) => onUpdateSettings({ autoSync: e.target.checked })}
-              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer disabled:cursor-not-allowed"
+              className="w-4 h-4 accent-white rounded cursor-pointer disabled:cursor-not-allowed"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-white/[0.06]">
             <div className="flex items-center gap-2.5">
-              <Mic className="w-4 h-4 text-emerald-400" />
-              <p className="text-xs font-semibold text-zinc-200">{t('settings.voiceChat')}</p>
+              <Mic className="w-4 h-4 text-white" />
+              <p className="text-xs font-medium text-zinc-200">{t('settings.voiceChat')}</p>
             </div>
             <input
               type="checkbox"
               disabled={!isHost}
               checked={settings.voiceChat}
               onChange={(e) => onUpdateSettings({ voiceChat: e.target.checked })}
-              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer disabled:cursor-not-allowed"
+              className="w-4 h-4 accent-white rounded cursor-pointer disabled:cursor-not-allowed"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-white/[0.06]">
             <div className="flex items-center gap-2.5">
-              <MessageSquare className="w-4 h-4 text-indigo-400" />
-              <p className="text-xs font-semibold text-zinc-200">{t('settings.chat')}</p>
+              <MessageSquare className="w-4 h-4 text-white" />
+              <p className="text-xs font-medium text-zinc-200">{t('settings.chat')}</p>
             </div>
             <input
               type="checkbox"
               disabled={!isHost}
               checked={settings.chatEnabled}
               onChange={(e) => onUpdateSettings({ chatEnabled: e.target.checked })}
-              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer disabled:cursor-not-allowed"
+              className="w-4 h-4 accent-white rounded cursor-pointer disabled:cursor-not-allowed"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-white/[0.06]">
             <div className="flex items-center gap-2.5">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <p className="text-xs font-semibold text-zinc-200">{t('settings.reactions')}</p>
+              <Sparkles className="w-4 h-4 text-white" />
+              <p className="text-xs font-medium text-zinc-200">{t('settings.reactions')}</p>
             </div>
             <input
               type="checkbox"
               disabled={!isHost}
               checked={settings.reactionsEnabled}
               onChange={(e) => onUpdateSettings({ reactionsEnabled: e.target.checked })}
-              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer disabled:cursor-not-allowed"
+              className="w-4 h-4 accent-white rounded cursor-pointer disabled:cursor-not-allowed"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
-            <p className="text-xs font-semibold text-zinc-200">{t('settings.language')}</p>
+          <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-white/[0.06]">
+            <p className="text-xs font-medium text-zinc-200">{t('settings.language')}</p>
             <LanguageSelector />
           </div>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-5">
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-white transition-colors"
+            className="w-full py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-xs font-semibold text-black transition-colors cursor-pointer shadow-sm"
           >
             {t('settings.close')}
           </button>

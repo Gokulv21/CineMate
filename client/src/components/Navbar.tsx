@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Heart, Menu, X, PlusCircle, LogIn, Download } from 'lucide-react';
+import { Menu, X, Plus, LogIn, Download } from 'lucide-react';
+import { Logo } from './Logo.js';
 import { LanguageSelector } from './LanguageSelector.js';
 
 interface NavbarProps {
@@ -28,37 +29,31 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full cinema-surface border-b border-zinc-800/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-40 w-full bg-[#08080a]/85 backdrop-blur-md border-b border-white/[0.06]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-15 flex items-center justify-between">
         {/* Brand */}
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/20">
-            <Heart className="w-5 h-5 text-emerald-500 fill-emerald-500" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
-              CineMate
-            </span>
-          </div>
-        </div>
+        <Logo
+          size="md"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        />
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-6">
           <button
             onClick={() => scrollToSection('how-it-works')}
-            className="text-sm font-medium text-zinc-400 hover:text-zinc-100 transition-colors"
+            className="text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
           >
             {t('nav.howItWorks')}
           </button>
           <button
             onClick={() => scrollToSection('features')}
-            className="text-sm font-medium text-zinc-400 hover:text-zinc-100 transition-colors"
+            className="text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
           >
             {t('nav.features')}
           </button>
           <button
             onClick={() => scrollToSection('privacy')}
-            className="text-sm font-medium text-zinc-400 hover:text-zinc-100 transition-colors"
+            className="text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
           >
             {t('nav.privacy')}
           </button>
@@ -71,27 +66,27 @@ export const Navbar: React.FC<NavbarProps> = ({
           {!isInstalled && onInstallApp && (
             <button
               onClick={onInstallApp}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-950/50 hover:bg-emerald-900/50 border border-emerald-800/50 hover:border-emerald-500/50 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-              title="Install CineMate as standalone App"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              title="Install CineMate App"
             >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Install App</span>
+              <Download className="w-4 h-4" />
             </button>
           )}
 
           <button
             onClick={onJoinRoom}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-zinc-900/90 hover:bg-zinc-800 border border-emerald-900/30 hover:border-emerald-700/50 transition-all flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center gap-1.5"
           >
-            <LogIn className="w-3.5 h-3.5 text-emerald-400" />
-            {t('nav.joinRoom')}
+            <LogIn className="w-3.5 h-3.5 text-zinc-400" />
+            <span>{t('nav.joinRoom')}</span>
           </button>
+
           <button
             onClick={onCreateRoom}
-            className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 border border-emerald-500/50 hover:shadow-emerald-600/30 active:scale-95 transition-all flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-black bg-white hover:bg-zinc-200 active:scale-98 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
           >
-            <PlusCircle className="w-3.5 h-3.5" />
-            {t('nav.createRoom')}
+            <Plus className="w-3.5 h-3.5" />
+            <span>{t('nav.createRoom')}</span>
           </button>
         </div>
 
@@ -100,81 +95,70 @@ export const Navbar: React.FC<NavbarProps> = ({
           {!isInstalled && onInstallApp && (
             <button
               onClick={onInstallApp}
-              className="p-1.5 rounded-lg text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 flex items-center gap-1 text-xs font-medium"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white"
               title="Install CineMate App"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span className="text-[11px] font-semibold">App</span>
+              <Download className="w-4 h-4" />
             </button>
           )}
 
           <LanguageSelector compact />
+
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 focus:outline-none"
-            aria-label="Toggle navigation menu"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-white"
+            aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5 text-zinc-300" />}
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-zinc-800/80 bg-[#071610]/95 backdrop-blur-xl px-4 pt-3 pb-5 space-y-3 animate-in slide-in-from-top-2 duration-150">
-          <div className="flex flex-col space-y-2 pt-1">
+        <div className="md:hidden border-b border-white/[0.08] bg-[#0c0c10] px-4 py-4 space-y-3">
+          <div className="flex flex-col space-y-2">
             <button
               onClick={() => scrollToSection('how-it-works')}
-              className="text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-900"
+              className="text-left py-1 text-sm font-medium text-zinc-300 hover:text-white"
             >
               {t('nav.howItWorks')}
             </button>
             <button
               onClick={() => scrollToSection('features')}
-              className="text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-900"
+              className="text-left py-1 text-sm font-medium text-zinc-300 hover:text-white"
             >
               {t('nav.features')}
             </button>
             <button
               onClick={() => scrollToSection('privacy')}
-              className="text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-900"
+              className="text-left py-1 text-sm font-medium text-zinc-300 hover:text-white"
             >
               {t('nav.privacy')}
             </button>
           </div>
-          <div className="pt-2 border-t border-zinc-800/80 flex flex-col gap-2">
-            {!isInstalled && onInstallApp && (
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onInstallApp();
-                }}
-                className="w-full py-2.5 rounded-lg text-sm font-semibold text-emerald-300 bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-800/60 flex items-center justify-center gap-2 cursor-pointer shadow-md"
-              >
-                <Download className="w-4 h-4 text-emerald-400" />
-                <span>Install CineMate App (PWA)</span>
-              </button>
-            )}
 
+          <div className="pt-3 border-t border-white/[0.08] flex flex-col gap-2">
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
                 onJoinRoom();
               }}
-              className="w-full py-2.5 rounded-lg text-sm font-medium text-zinc-200 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/60 flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-lg text-xs font-medium text-zinc-300 bg-white/[0.04] border border-white/[0.08] flex items-center justify-center gap-2"
             >
-              <LogIn className="w-4 h-4 text-emerald-400" />
-              {t('nav.joinRoom')}
+              <LogIn className="w-4 h-4" />
+              <span>{t('nav.joinRoom')}</span>
             </button>
+
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
                 onCreateRoom();
               }}
-              className="w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/30 flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-lg text-xs font-semibold text-black bg-white hover:bg-zinc-200 flex items-center justify-center gap-2"
             >
-              <PlusCircle className="w-4 h-4" />
-              {t('nav.createRoom')}
+              <Plus className="w-4 h-4" />
+              <span>{t('nav.createRoom')}</span>
             </button>
           </div>
         </div>
@@ -182,4 +166,3 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
-
