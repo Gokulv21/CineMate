@@ -13,6 +13,9 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    watch: {
+      ignored: ['**/dist/**', '**/.git/**'],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

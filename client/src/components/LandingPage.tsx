@@ -143,10 +143,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-center gap-2 text-sm">
-              <span>❤️</span>
+              <span>💚</span>
               <span>🍿</span>
               <span>😂</span>
               <span>🔥</span>
+              <span>👏</span>
             </div>
           </div>
         </div>

@@ -11,7 +11,7 @@ interface ChatPanelProps {
   reactionsEnabled: boolean;
 }
 
-const QUICK_EMOJIS = ['❤️', '🍿', '😂', '😭', '😱', '🔥', '👏'];
+const QUICK_EMOJIS = ['💚', '🍿', '😂', '😭', '🔥', '👏'];
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   messages,
@@ -94,11 +94,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
 
                 <div
-                  className={`px-3 py-2 rounded-2xl text-xs max-w-[85%] break-words leading-relaxed ${
-                    isMe
-                      ? 'bg-white text-black rounded-tr-none shadow-sm font-normal'
-                      : 'bg-zinc-800 text-zinc-200 rounded-tl-none border border-white/[0.08]'
-                  }`}
+                  className={`px-3 py-2 rounded-2xl text-xs max-w-[85%] break-words leading-relaxed ${isMe
+                    ? 'bg-white text-black rounded-tr-none shadow-sm font-normal'
+                    : 'bg-zinc-800 text-zinc-200 rounded-tl-none border border-white/[0.08]'
+                    }`}
                 >
                   {msg.message}
                 </div>

@@ -25,8 +25,6 @@ import {
   Send,
   X,
   Sun,
-  Mic,
-  MicOff,
   Headphones
 } from 'lucide-react';
 import type { VideoMetadata, ChatMessage, FloatingReaction } from '../types/index.js';
@@ -34,6 +32,88 @@ import { formatTime } from '../lib/utils.js';
 import { ReactionOverlay } from './ReactionOverlay.js';
 
 export type VideoFitMode = 'contain' | 'cover' | 'fill' | '16-9' | '21-9' | '4-3';
+
+export interface SubtitleCue {
+  id: number;
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface SubtitleTrack {
+  id: string;
+  label: string;
+  src: string;
+  lang: string;
+  cues: SubtitleCue[];
+}
+
+function parseSubtitleTimestamp(timeStr: string): number {
+  if (!timeStr) return 0;
+  const cleaned = timeStr.trim().replace(',', '.');
+  const parts = cleaned.split(':');
+  if (parts.length === 3) {
+    const hours = parseFloat(parts[0]) || 0;
+    const mins = parseFloat(parts[1]) || 0;
+    const secs = parseFloat(parts[2]) || 0;
+    return hours * 3600 + mins * 60 + secs;
+  } else if (parts.length === 2) {
+    const mins = parseFloat(parts[0]) || 0;
+    const secs = parseFloat(parts[1]) || 0;
+    return mins * 60 + secs;
+  }
+  return parseFloat(cleaned) || 0;
+}
+
+function parseSrtOrVtt(content: string): SubtitleCue[] {
+  const cues: SubtitleCue[] = [];
+  const normalized = content.replace(/\r\n|\r/g, '\n');
+  const lines = normalized.split('\n');
+
+  let i = 0;
+  let cueId = 1;
+  while (i < lines.length) {
+    const rawLine = lines[i].trim();
+    if (!rawLine || rawLine.startsWith('WEBVTT') || rawLine.startsWith('NOTE') || rawLine.startsWith('STYLE')) {
+      i++;
+      continue;
+    }
+
+    let timeLine = rawLine;
+    if (!timeLine.includes('-->') && i + 1 < lines.length && lines[i + 1].includes('-->')) {
+      i++;
+      timeLine = lines[i].trim();
+    }
+
+    if (timeLine.includes('-->')) {
+      const parts = timeLine.split('-->');
+      const startStr = parts[0]?.trim().split(/\s+/)[0] || '';
+      const endStr = parts[1]?.trim().split(/\s+/)[0] || '';
+      const start = parseSubtitleTimestamp(startStr);
+      const end = parseSubtitleTimestamp(endStr);
+
+      i++;
+      const textLines: string[] = [];
+      while (i < lines.length && lines[i].trim() !== '') {
+        const clean = lines[i].replace(/<[^>]+>/g, '').trim();
+        if (clean) textLines.push(clean);
+        i++;
+      }
+
+      if (textLines.length > 0 && !isNaN(start) && !isNaN(end) && end > start) {
+        cues.push({
+          id: cueId++,
+          start,
+          end,
+          text: textLines.join('\n')
+        });
+      }
+    } else {
+      i++;
+    }
+  }
+  return cues;
+}
 
 interface VideoPlayerProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -82,10 +162,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   messages = [],
   currentParticipantId = '',
   onSendMessage,
-  voiceEnabled = false,
-  isVoiceMuted = true,
-  onToggleVoiceMute,
-  isSpeakingLocally = false,
   partnerIsSpeaking = false,
   partnerName = '',
   videoEventHandlers
@@ -123,6 +199,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Rotated Landscape state (automatic on mobile when entering fullscreen)
   const [isRotatedLandscape, setIsRotatedLandscape] = useState<boolean>(false);
 
+  // VLC-Style Screen Lock state
+  const [isScreenLocked, setIsScreenLocked] = useState<boolean>(false);
+  const [showUnlockOverlay, setShowUnlockOverlay] = useState<boolean>(false);
+  const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // VLC / MX Player Screen Brightness (1.0 = 100%, 0.3 - 1.6)
   const [brightness, setBrightness] = useState<number>(1.0);
 
@@ -149,19 +230,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [videoErrorMessage, setVideoErrorMessage] = useState<string | null>(null);
 
   // Subtitles / Captions (CC)
-  const [subtitles, setSubtitles] = useState<{ id: string; label: string; src: string; lang: string }[]>([]);
+  const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([]);
   const [selectedSubtitle, setSelectedSubtitle] = useState<string | null>(null);
-  const [showSubtitleMenu, setShowSubtitleMenu] = useState<boolean>(false);
+  const [activeSubtitleText, setActiveSubtitleText] = useState<string>('');
   const subtitleInputRef = useRef<HTMLInputElement>(null);
 
   // Audio Tracks / Languages
   const [audioTracks, setAudioTracks] = useState<{ id: string; label: string; language: string }[]>([]);
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<string>('default');
-  const [showAudioMenu, setShowAudioMenu] = useState<boolean>(false);
   const externalAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [externalAudioTracks, setExternalAudioTracks] = useState<{ id: string; label: string; src: string }[]>([]);
   const [activeExternalAudioId, setActiveExternalAudioId] = useState<string | null>(null);
+
+  // Unified Tracks Popover (Subtitles + Audio in 1 clean dialog)
+  const [showTracksMenu, setShowTracksMenu] = useState<boolean>(false);
+  const [tracksMenuTab, setTracksMenuTab] = useState<'subtitles' | 'audio'>('subtitles');
 
   // MKV unsupported warning dismissal
   const [dismissMkvNotice, setDismissMkvNotice] = useState<boolean>(false);
@@ -188,8 +272,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       controlsTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
         setShowFitMenu(false);
-        setShowSubtitleMenu(false);
-        setShowAudioMenu(false);
+        setShowTracksMenu(false);
       }, 4500);
     }
   }, [isPlaying]);
@@ -274,6 +357,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const text = event.target?.result as string;
       if (!text) return;
 
+      const cues = parseSrtOrVtt(text);
+
       let vttContent = text;
       // Convert SRT to WebVTT
       if (!text.trim().startsWith('WEBVTT')) {
@@ -284,16 +369,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       const blob = new Blob([vttContent], { type: 'text/vtt' });
       const subUrl = URL.createObjectURL(blob);
-      const newSub = {
+      const newSub: SubtitleTrack = {
         id: `sub-${Date.now()}`,
         label: file.name.replace(/\.(srt|vtt)$/i, ''),
         src: subUrl,
-        lang: 'en'
+        lang: 'en',
+        cues
       };
 
       setSubtitles(prev => [...prev, newSub]);
       setSelectedSubtitle(newSub.id);
-      setShowSubtitleMenu(false);
+      setShowTracksMenu(false);
       resetControlsTimeout();
     };
     reader.readAsText(file);
@@ -318,7 +404,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Audio track switch handler
   const handleSelectAudioTrack = (trackId: string) => {
     setSelectedAudioTrack(trackId);
-    setShowAudioMenu(false);
+    setShowTracksMenu(false);
     resetControlsTimeout();
 
     if (trackId === 'default') {
@@ -398,7 +484,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
     }
 
-    setShowAudioMenu(false);
+    setShowTracksMenu(false);
     resetControlsTimeout();
     e.target.value = '';
   };
@@ -443,11 +529,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleTimeUpdate = () => {
     const video = videoRef.current;
     if (video) {
-      setCurrentTime(video.currentTime);
+      const time = video.currentTime;
+      setCurrentTime(time);
+
+      // On-screen subtitle cue sync
+      if (selectedSubtitle) {
+        const track = subtitles.find(s => s.id === selectedSubtitle);
+        if (track && track.cues.length > 0) {
+          const match = track.cues.find(c => time >= c.start && time <= c.end);
+          setActiveSubtitleText(match ? match.text : '');
+        } else {
+          setActiveSubtitleText('');
+        }
+      } else {
+        setActiveSubtitleText('');
+      }
+
       // Sync external audio drift if > 0.35s
       if (activeExternalAudioId && externalAudioRef.current) {
-        if (Math.abs(externalAudioRef.current.currentTime - video.currentTime) > 0.35) {
-          externalAudioRef.current.currentTime = video.currentTime;
+        if (Math.abs(externalAudioRef.current.currentTime - time) > 0.35) {
+          externalAudioRef.current.currentTime = time;
         }
       }
     }
@@ -456,6 +557,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleEnded = () => {
     setIsEnded(true);
     setIsPlaying(false);
+    setIsScreenLocked(false);
+    setShowUnlockOverlay(false);
     if (externalAudioRef.current) {
       externalAudioRef.current.pause();
       externalAudioRef.current.currentTime = 0;
@@ -500,17 +603,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const togglePlayPause = useCallback(() => {
-    if (!videoRef.current || !canControl) return;
+    if (!videoRef.current || !canControl || isScreenLocked) return;
 
     if (videoRef.current.paused) {
       onPlay();
     } else {
       onPause();
     }
-  }, [canControl, onPlay, onPause, videoRef]);
+  }, [canControl, isScreenLocked, onPlay, onPause, videoRef]);
 
   const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canControl) return;
+    if (!canControl || isScreenLocked) return;
     const target = parseFloat(e.target.value);
     setCurrentTime(target);
     if (externalAudioRef.current) {
@@ -521,6 +624,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const handleMouseMoveScrubber = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isScreenLocked) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
     setHoverTime(percent * duration);
@@ -815,6 +919,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if ((e.target as HTMLElement).closest('button, input, select, a, [data-interactive="true"]')) {
       return;
     }
+    if (isScreenLocked) {
+      setShowUnlockOverlay(true);
+      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+      unlockTimerRef.current = setTimeout(() => {
+        setShowUnlockOverlay(false);
+        setShowQuickReactions(false);
+      }, 2800);
+      return;
+    }
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -855,7 +968,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!touchTrackingRef.current.isTracking || e.touches.length !== 1) return;
+    if (isScreenLocked || !touchTrackingRef.current.isTracking || e.touches.length !== 1) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -935,6 +1048,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isScreenLocked) {
+      touchTrackingRef.current.isTracking = false;
+      return;
+    }
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
@@ -998,8 +1115,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           if (wasOpen) {
             setShowControls(false);
             setShowFitMenu(false);
-            setShowSubtitleMenu(false);
-            setShowAudioMenu(false);
+            setShowTracksMenu(false);
             setShowQuickReactions(false);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
           } else {
@@ -1018,6 +1134,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'touch') return;
     if ((e.target as HTMLElement).closest('button, input, select, a, [data-interactive="true"]')) {
+      return;
+    }
+    if (isScreenLocked) {
+      setShowUnlockOverlay(true);
+      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+      unlockTimerRef.current = setTimeout(() => {
+        setShowUnlockOverlay(false);
+        setShowQuickReactions(false);
+      }, 2800);
       return;
     }
 
@@ -1039,7 +1164,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'touch') return;
+    if (e.pointerType === 'touch' || isScreenLocked) return;
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
@@ -1080,8 +1205,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (wasOpen) {
           setShowControls(false);
           setShowFitMenu(false);
-          setShowSubtitleMenu(false);
-          setShowAudioMenu(false);
+          setShowTracksMenu(false);
           setShowQuickReactions(false);
           if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         } else {
@@ -1115,7 +1239,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Pointer move inside container resets controls auto-hide timer (mouse hover only)
   const handleContainerPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'touch') return; // Ignore mobile touch moves
+    if (e.pointerType === 'touch' || isScreenLocked) return; // Ignore mobile touch moves or when locked
     if (!showControls) {
       setShowControls(true);
     }
@@ -1167,6 +1291,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         return;
       }
 
+      if (isScreenLocked) {
+        if (e.code === 'Escape' && isFullscreen) {
+          handleExitFullscreen();
+        }
+        return;
+      }
+
       if (e.code === 'Space') {
         e.preventDefault();
         togglePlayPause();
@@ -1191,7 +1322,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [togglePlayPause, canControl, isFullscreen, resetControlsTimeout]);
+  }, [togglePlayPause, canControl, isFullscreen, resetControlsTimeout, isScreenLocked]);
 
   useEffect(() => {
     return () => {
@@ -1202,6 +1333,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (singleClickTimerRef.current) clearTimeout(singleClickTimerRef.current);
       if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
       if (doubleTapFeedbackTimerRef.current) clearTimeout(doubleTapFeedbackTimerRef.current);
+      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
     };
   }, [videoSrc]);
 
@@ -1252,7 +1384,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           ? 'fixed z-[9999] rounded-none border-0 overflow-hidden shadow-2xl'
           : isFullscreen
           ? 'fixed inset-0 z-50 rounded-none border-0 aspect-auto w-screen h-screen'
-          : 'relative w-full h-full overflow-hidden shadow-2xl rounded-2xl border border-white/10 group aspect-video'
+          : 'relative w-full aspect-video max-h-full overflow-hidden shadow-2xl rounded-2xl border border-white/10 group'
       }`}
       style={
         isRotatedLandscape
@@ -1361,6 +1493,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onChange={handleAudioFileChange}
             className="hidden"
           />
+
+          {/* ONSCREEN SUBTITLE TEXT OVERLAY (Guaranteed 100% reliable across all browsers & local files) */}
+          {activeSubtitleText && (
+            <div className="absolute bottom-16 sm:bottom-20 inset-x-4 flex justify-center pointer-events-none z-25 text-center">
+              <span className="inline-block px-3.5 py-1.5 rounded-xl bg-black/85 backdrop-blur-xs text-white text-xs sm:text-sm md:text-base font-semibold shadow-2xl border border-white/10 max-w-[88%] whitespace-pre-line tracking-wide drop-shadow-md">
+                {activeSubtitleText}
+              </span>
+            </div>
+          )}
 
           {/* MKV CODEC NOTICE */}
           {fileName.toLowerCase().endsWith('.mkv') && !dismissMkvNotice && (
@@ -1536,7 +1677,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onClick={(e) => e.stopPropagation()}
             data-interactive="true"
             className={`absolute top-0 inset-x-0 p-3 sm:p-4 bg-gradient-to-b from-black/90 via-black/40 to-transparent transition-all duration-300 flex items-center justify-between z-30 ${
-              showControls ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-full opacity-0 pointer-events-none'
+              showControls && !isScreenLocked ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-full opacity-0 pointer-events-none'
             }`}
           >
             {/* Left: Back button (if Fullscreen or Rotated Landscape), Movie Title & Duration */}
@@ -1573,35 +1714,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               )}
             </div>
 
-            {/* Right: In-Player Mic, In-Player Chat, Aspect Fit & Change Video */}
-            <div className="flex items-center gap-1.5 sm:gap-2" data-interactive="true">
-              {/* In-Player Mic Toggle in Top HUD */}
-              {voiceEnabled && onToggleVoiceMute && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleVoiceMute();
-                  }}
-                  className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 shrink-0 ${
-                    isVoiceMuted
-                      ? 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 border-white/10'
-                      : 'bg-white hover:bg-zinc-200 text-black border-white shadow-sm'
-                  }`}
-                  title={isVoiceMuted ? 'Unmute Microphone' : 'Mute Microphone'}
-                >
-                  {isVoiceMuted ? (
-                    <MicOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-400" />
-                  ) : (
-                    <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black" />
-                  )}
-                  <span className="text-[11px] font-semibold hidden md:inline">
-                    {isVoiceMuted ? 'Unmute' : isSpeakingLocally ? 'Speaking' : 'Mic'}
-                  </span>
-                </button>
-              )}
-
-              {/* In-Player Live Chat Button */}
+            {/* Right: Unified Player Controls Toolbar (VLC / MX Player style) */}
+            <div 
+              className="flex items-center bg-black/70 backdrop-blur-xl border border-white/15 rounded-xl p-0.5 shadow-2xl shrink-0" 
+              data-interactive="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Chat Button */}
               {onSendMessage && (
                 <button
                   type="button"
@@ -1609,14 +1728,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     e.stopPropagation();
                     setIsChatOpen(prev => !prev);
                   }}
-                  className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 shrink-0 ${
+                  className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                     isChatOpen
-                      ? 'bg-white text-black border-white'
-                      : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white border-white/10'
+                      ? 'bg-white text-black font-semibold'
+                      : 'text-zinc-300 hover:text-white hover:bg-white/10'
                   }`}
-                  title="Open Live Chat"
+                  title="Live Chat"
                 >
-                  <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <MessageSquare className="w-3.5 h-3.5" />
                   <span className="text-[11px] font-semibold hidden md:inline">Chat</span>
                   {messages && messages.length > 0 && (
                     <span className="text-[9px] bg-white/20 px-1.5 py-0.2 rounded-full font-mono">
@@ -1625,6 +1744,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   )}
                 </button>
               )}
+
+              <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+
               {/* Aspect Ratio / Fit Selector */}
               <div className="relative">
                 <button
@@ -1633,11 +1755,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     e.stopPropagation();
                     setShowFitMenu(prev => !prev);
                   }}
-                  className="text-xs text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
+                  className="px-2 py-1.5 rounded-lg text-xs text-zinc-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1 font-medium cursor-pointer"
                   title="Aspect Ratio & Fit Mode"
                 >
                   <Scaling className="w-3.5 h-3.5 text-zinc-300" />
-                  <span className="font-semibold">{currentFitOption.iconLabel}</span>
+                  <span className="font-semibold text-[11px]">{currentFitOption.iconLabel}</span>
                 </button>
 
                 {showFitMenu && (
@@ -1671,6 +1793,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 )}
               </div>
 
+              <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+
               {/* Change video button */}
               <button
                 type="button"
@@ -1678,14 +1802,154 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   e.stopPropagation();
                   fileInputRef.current?.click();
                 }}
-                className="text-xs text-zinc-400 hover:text-white px-2.5 py-1.5 rounded-lg bg-zinc-900/70 hover:bg-zinc-800 border border-zinc-700/50 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1 cursor-pointer"
                 title={t('video.changeFileButton')}
               >
-                <Upload className="w-3 h-3 text-zinc-400" />
-                <span className="hidden sm:inline">{t('video.changeFileButton')}</span>
+                <Upload className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-medium hidden sm:inline">{t('video.changeFileButton')}</span>
               </button>
             </div>
           </div>
+
+          {/* VLC Floating Lock Button (Left Edge of Player) */}
+          {/* When controls are shown: visible on left side */}
+          {showControls && !isScreenLocked && (
+            <button
+              type="button"
+              data-interactive="true"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsScreenLocked(true);
+                setShowControls(false);
+                setShowFitMenu(false);
+                setShowTracksMenu(false);
+                setShowQuickReactions(false);
+                setIsChatOpen(false);
+                setShowUnlockOverlay(false);
+                if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+              }}
+              className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-40 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/75 hover:bg-black/95 text-zinc-300 hover:text-amber-400 border border-white/20 hover:border-amber-400/60 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all duration-200 active:scale-90 cursor-pointer group"
+              aria-label="Lock screen controls"
+              title="Lock Screen Controls"
+            >
+              <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-200 group-hover:text-amber-400 transition-colors" />
+            </button>
+          )}
+
+          {/* VLC Floating Lock Button (COMPLETELY HIDES WHEN IDLE, REVEALS ON SCREEN TAP) */}
+          {isScreenLocked && (
+            <div
+              className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-50 flex items-center transition-all duration-300 ${
+                showUnlockOverlay ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-75 pointer-events-none'
+              }`}
+            >
+              <button
+                type="button"
+                data-interactive="true"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsScreenLocked(false);
+                  setShowUnlockOverlay(false);
+                  setShowControls(true);
+                  resetControlsTimeout();
+                }}
+                className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-black/90 hover:bg-black border border-amber-500/80 hover:border-amber-400 text-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.5)] backdrop-blur-xl flex items-center justify-center transition-all duration-200 active:scale-90 cursor-pointer ring-4 ring-amber-500/25 hover:ring-amber-500/40"
+                aria-label="Unlock screen"
+                title="Unlock Screen"
+              >
+                <Lock className="w-5 h-5 text-amber-400" />
+              </button>
+            </div>
+          )}
+
+          {/* Locked Mode Actions: Keep React and Chat enabled even while screen is locked! */}
+          {isScreenLocked && (
+            <div
+              data-interactive="true"
+              onClick={(e) => e.stopPropagation()}
+              className={`absolute top-3 sm:top-4 right-3 sm:right-4 z-50 flex items-center gap-1.5 bg-black/85 backdrop-blur-xl border border-white/20 rounded-2xl p-1 shadow-2xl transition-all duration-300 ${
+                showUnlockOverlay || isChatOpen || showQuickReactions
+                  ? 'opacity-100 scale-100 pointer-events-auto'
+                  : 'opacity-0 scale-90 pointer-events-none'
+              }`}
+            >
+              {/* React button */}
+              {reactionsEnabled && onSendReaction && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowQuickReactions(prev => !prev);
+                      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+                      unlockTimerRef.current = setTimeout(() => setShowUnlockOverlay(false), 5000);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer text-xs ${
+                      showQuickReactions
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                        : 'bg-white/5 hover:bg-white/10 border-white/10 text-zinc-200 hover:text-white'
+                    }`}
+                    title="Send Reaction"
+                  >
+                    <Heart className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20" />
+                    <span className="font-semibold text-[11px]">React</span>
+                  </button>
+
+                  {showQuickReactions && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-full mt-2 right-0 bg-[#111116] border border-white/15 shadow-2xl rounded-2xl p-1.5 backdrop-blur-xl flex items-center gap-1 z-55 animate-in fade-in zoom-in-95"
+                    >
+                      {['💚', '🍿', '😂', '🔥', '👏'].map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => {
+                            onSendReaction(emoji);
+                            setShowQuickReactions(false);
+                            if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+                            unlockTimerRef.current = setTimeout(() => setShowUnlockOverlay(false), 2000);
+                          }}
+                          className="w-8 h-8 flex items-center justify-center text-lg hover:bg-white/10 rounded-xl active:scale-125 transition-transform cursor-pointer"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Chat Button */}
+              {onSendMessage && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsChatOpen(prev => !prev);
+                    if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+                    if (!isChatOpen) {
+                      setShowUnlockOverlay(true);
+                    }
+                  }}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isChatOpen
+                      ? 'bg-white text-black'
+                      : 'bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-200 hover:text-white'
+                  }`}
+                  title="Live Chat"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Chat</span>
+                  {messages && messages.length > 0 && (
+                    <span className="text-[9px] bg-emerald-500/30 text-emerald-300 px-1.5 py-0.2 rounded-full font-mono">
+                      {messages.length}
+                    </span>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* CENTER PLAY / PAUSE & SKIP CONTROLS (VLC / MX Player style) */}
           <div
@@ -1694,7 +1958,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onClick={(e) => e.stopPropagation()}
             data-interactive="true"
             className={`absolute inset-0 flex items-center justify-center gap-6 sm:gap-12 pointer-events-none z-20 transition-all duration-300 ${
-              showControls ? 'scale-100 opacity-100' : 'scale-90 opacity-0 pointer-events-none'
+              showControls && !isScreenLocked ? 'scale-100 opacity-100' : 'scale-90 opacity-0 pointer-events-none'
             }`}
           >
             {/* Rewind 10s */}
@@ -1754,7 +2018,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onClick={(e) => e.stopPropagation()}
             data-interactive="true"
             className={`absolute bottom-0 inset-x-0 px-2 sm:px-4 pb-2 sm:pb-4 pt-6 sm:pt-8 bg-gradient-to-t from-black/95 via-black/70 to-transparent transition-all duration-300 z-30 ${
-              showControls ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'
+              showControls && !isScreenLocked ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'
             }`}
           >
             {/* Scrubber Progress Bar */}
@@ -1787,7 +2051,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 max={duration || 100}
                 step={0.1}
                 value={currentTime}
-                disabled={!canControl}
+                disabled={!canControl || isScreenLocked}
                 onChange={handleSeekChange}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                 aria-label="Seek video position"
@@ -1805,10 +2069,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 </div>
 
                 {!canControl && (
-                  <div className="hidden md:flex items-center gap-1 text-[10px] text-zinc-400 bg-zinc-900/80 px-1.5 py-0.5 rounded border border-zinc-800">
-                    <Lock className="w-3 h-3 text-zinc-400" />
-                    <span className="hidden lg:inline">{t('video.hostOnlyControl')}</span>
-                  </div>
+                  <span className="hidden md:inline-block text-[10px] text-zinc-400 bg-zinc-900/80 px-1.5 py-0.5 rounded border border-zinc-800">
+                    {t('video.hostOnlyControl')}
+                  </span>
                 )}
               </div>
 
@@ -1831,7 +2094,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                       }`}
                       title="Send Reaction"
                     >
-                      <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                      <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 fill-emerald-400/20" />
                       <span className="text-[10px] sm:text-[11px] font-semibold hidden md:inline">React</span>
                     </button>
 
@@ -1840,7 +2103,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                         onClick={(e) => e.stopPropagation()}
                         className="absolute bottom-full mb-2 left-0 sm:left-auto sm:right-0 bg-[#111116] border border-white/10 shadow-2xl rounded-2xl p-1.5 backdrop-blur-xl flex items-center gap-1 z-50 animate-in fade-in zoom-in-95"
                       >
-                        {['❤️', '🍿', '😂', '🔥', '👏', '😮'].map((emoji) => (
+                        {['💚', '🍿', '😂', '🔥', '👏'].map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
@@ -1902,235 +2165,221 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   </select>
                 </div>
 
-                {/* Subtitles / Captions (CC) */}
+                {/* Unified Audio & Subtitles / Tracks Button (Clean single button) */}
                 <div className="relative shrink-0">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowSubtitleMenu(prev => !prev);
-                      setShowAudioMenu(false);
+                      setShowTracksMenu(prev => !prev);
                       setShowFitMenu(false);
+                      setShowQuickReactions(false);
                     }}
-                    className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 shrink-0 ${
-                      selectedSubtitle
-                        ? 'bg-white/15 text-white border border-white/25 shadow-sm'
-                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
-                    }`}
-                    aria-label="Subtitles & Captions"
-                    title="Subtitles & Captions (CC)"
-                  >
-                    <Captions className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    {selectedSubtitle && (
-                      <span className="text-[8px] sm:text-[9px] font-bold text-white">CC</span>
-                    )}
-                  </button>
-
-                  {/* Subtitle Selection Popover */}
-                  {showSubtitleMenu && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute right-0 bottom-full mb-2 w-52 sm:w-56 rounded-xl bg-[#111116] border border-white/10 shadow-2xl backdrop-blur-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
-                    >
-                      <div className="px-3 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-white/[0.06] flex items-center justify-between">
-                        <span>Subtitles / Captions</span>
-                        <span className="text-zinc-400 font-mono text-[9px]">{subtitles.length} available</span>
-                      </div>
-
-                      <div className="max-h-48 overflow-y-auto py-1">
-                        {/* Off */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedSubtitle(null);
-                            setShowSubtitleMenu(false);
-                            resetControlsTimeout();
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors cursor-pointer ${
-                            !selectedSubtitle
-                              ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
-                              : 'text-zinc-300 hover:text-white hover:bg-zinc-800/80'
-                          }`}
-                        >
-                          <span>Off</span>
-                          {!selectedSubtitle && <Check className="w-3.5 h-3.5 text-emerald-400" />}
-                        </button>
-
-                        {/* Subtitle tracks list */}
-                        {subtitles.map(sub => (
-                          <button
-                            key={sub.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedSubtitle(sub.id);
-                              setShowSubtitleMenu(false);
-                              resetControlsTimeout();
-                            }}
-                            className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors cursor-pointer ${
-                              selectedSubtitle === sub.id
-                                ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
-                                : 'text-zinc-300 hover:text-white hover:bg-zinc-800/80'
-                            }`}
-                          >
-                            <span className="truncate pr-2">{sub.label}</span>
-                            {selectedSubtitle === sub.id && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Add Subtitle File button */}
-                      <div className="p-1.5 border-t border-zinc-800/80">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            subtitleInputRef.current?.click();
-                          }}
-                          className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-emerald-500/30"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Load .SRT / .VTT Subtitle</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Audio Language / Track Selector */}
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowAudioMenu(prev => !prev);
-                      setShowSubtitleMenu(false);
-                      setShowFitMenu(false);
-                    }}
-                    className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 shrink-0 ${
-                      selectedAudioTrack !== 'default'
+                    className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
+                      showTracksMenu || selectedSubtitle || selectedAudioTrack !== 'default'
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                         : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                     }`}
-                    aria-label="Audio Tracks & Languages"
-                    title="Audio Tracks & Languages"
+                    aria-label="Audio & Subtitles"
+                    title="Audio Tracks & Subtitles"
                   >
                     <Languages className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    {selectedAudioTrack !== 'default' && (
-                      <span className="text-[8px] sm:text-[9px] font-bold text-emerald-300">AU</span>
+                    {(selectedSubtitle || selectedAudioTrack !== 'default') && (
+                      <span className="text-[8px] sm:text-[9px] font-bold text-emerald-300">
+                        {selectedSubtitle && selectedAudioTrack !== 'default' ? 'AU+CC' : selectedSubtitle ? 'CC' : 'AU'}
+                      </span>
                     )}
                   </button>
 
-                  {/* Audio Track Selection Popover */}
-                  {showAudioMenu && (
+                  {/* Unified Popover with 2 Clean Tabs: Subtitles & Audio */}
+                  {showTracksMenu && (
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="absolute right-0 bottom-full mb-2 w-56 sm:w-64 rounded-xl bg-zinc-950/95 border border-emerald-900/60 shadow-2xl backdrop-blur-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+                      className="absolute right-0 bottom-full mb-2 w-64 sm:w-72 rounded-2xl bg-[#111116] border border-white/10 shadow-2xl backdrop-blur-2xl py-2.5 z-50 animate-in fade-in zoom-in-95 duration-100"
                     >
-                      <div className="px-3 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-zinc-800/80 flex items-center justify-between">
-                        <span>Audio Track / Language</span>
-                        {(audioTracks.length > 0 || externalAudioTracks.length > 0) && (
-                          <span className="text-emerald-400 font-mono text-[9px]">
-                            {1 + audioTracks.length + externalAudioTracks.length} tracks
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="max-h-48 overflow-y-auto py-1">
-                        {/* Default / Original Track */}
+                      {/* Tabs Header */}
+                      <div className="px-2.5 pb-2 border-b border-white/[0.08] flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => handleSelectAudioTrack('default')}
-                          className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors cursor-pointer ${
-                            selectedAudioTrack === 'default'
-                              ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
-                              : 'text-zinc-300 hover:text-white hover:bg-zinc-800/80'
+                          onClick={() => setTracksMenuTab('subtitles')}
+                          className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                            tracksMenuTab === 'subtitles'
+                              ? 'bg-white text-black shadow-md'
+                              : 'text-zinc-400 hover:text-white hover:bg-white/5'
                           }`}
                         >
-                          <span className="truncate pr-2">Original / Default</span>
-                          {selectedAudioTrack === 'default' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                          <Captions className="w-3.5 h-3.5" />
+                          <span>Subtitles</span>
+                          {selectedSubtitle && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          )}
                         </button>
 
-                        {/* Native detected tracks */}
-                        {audioTracks.map(track => (
-                          <button
-                            key={track.id}
-                            type="button"
-                            onClick={() => handleSelectAudioTrack(track.id)}
-                            className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors cursor-pointer ${
-                              selectedAudioTrack === track.id
-                                ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
-                                : 'text-zinc-300 hover:text-white hover:bg-zinc-800/80'
-                            }`}
-                          >
-                            <span className="truncate pr-2">{track.label}</span>
-                            {selectedAudioTrack === track.id && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                          </button>
-                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setTracksMenuTab('audio')}
+                          className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                            tracksMenuTab === 'audio'
+                              ? 'bg-white text-black shadow-md'
+                              : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <Languages className="w-3.5 h-3.5" />
+                          <span>Audio</span>
+                          {selectedAudioTrack !== 'default' && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          )}
+                        </button>
+                      </div>
 
-                        {/* User loaded external audio tracks (e.g. Tamil .m4a / .aac / .mp3) */}
-                        {externalAudioTracks.map(track => (
-                          <button
-                            key={track.id}
-                            type="button"
-                            onClick={() => handleSelectAudioTrack(track.id)}
-                            className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors cursor-pointer ${
-                              selectedAudioTrack === track.id
-                                ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
-                                : 'text-zinc-300 hover:text-white hover:bg-zinc-800/80'
-                            }`}
-                          >
-                            <span className="truncate pr-2 flex items-center gap-1.5 min-w-0">
-                              <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-800/60 shrink-0">
-                                AUDIO
-                              </span>
-                              <span className="truncate">{track.label}</span>
-                            </span>
-                            {selectedAudioTrack === track.id && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                          </button>
-                        ))}
+                      {/* Tab 1: Subtitles Content */}
+                      {tracksMenuTab === 'subtitles' && (
+                        <div>
+                          <div className="max-h-48 overflow-y-auto py-1 px-1">
+                            {/* Off */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedSubtitle(null);
+                                setActiveSubtitleText('');
+                                resetControlsTimeout();
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left rounded-lg transition-colors cursor-pointer ${
+                                !selectedSubtitle
+                                  ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
+                                  : 'text-zinc-300 hover:text-white hover:bg-white/5'
+                              }`}
+                            >
+                              <span>Off (No Subtitles)</span>
+                              {!selectedSubtitle && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                            </button>
 
-                        {audioTracks.length === 0 && externalAudioTracks.length === 0 && (
-                          <div className="px-3 py-1.5 text-[11px] text-zinc-400 italic">
-                            1 audio stream active
+                            {/* List of Loaded Subtitles */}
+                            {subtitles.map(sub => (
+                              <button
+                                key={sub.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedSubtitle(sub.id);
+                                  resetControlsTimeout();
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left rounded-lg transition-colors cursor-pointer ${
+                                  selectedSubtitle === sub.id
+                                    ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
+                                    : 'text-zinc-300 hover:text-white hover:bg-white/5'
+                                }`}
+                              >
+                                <span className="truncate pr-2">{sub.label}</span>
+                                {selectedSubtitle === sub.id && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                              </button>
+                            ))}
                           </div>
-                        )}
-                      </div>
 
-                      {/* Add External Audio Track button */}
-                      <div className="p-2 border-t border-zinc-800/80 space-y-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            audioFileInputRef.current?.click();
-                          }}
-                          className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-emerald-500/30"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Load Tamil / Audio Track</span>
-                        </button>
-                        <p className="text-[10px] text-zinc-400 leading-tight px-1 text-center">
-                          Select an external .m4a, .aac, .mp3 or .wav audio file for Tamil
-                        </p>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              if (videoRef.current && 'setSinkId' in videoRef.current) {
-                                await (videoRef.current as any).setSinkId('');
-                              }
-                              if (externalAudioRef.current && 'setSinkId' in externalAudioRef.current) {
-                                await (externalAudioRef.current as any).setSinkId('');
-                              }
-                            } catch (err) {
-                              console.warn('Sync audio sink error:', err);
-                            }
-                          }}
-                          className="w-full py-1.5 px-2.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-zinc-700/60"
-                          title="Re-route audio to newly connected Bluetooth earpods or headphones"
-                        >
-                          <Headphones className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Re-sync to Earpods / Headset</span>
-                        </button>
-                      </div>
+                          {/* Load Subtitle Button */}
+                          <div className="p-2 border-t border-white/[0.08] mt-1">
+                            <button
+                              type="button"
+                              onClick={() => subtitleInputRef.current?.click()}
+                              className="w-full py-1.5 px-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-emerald-500/30"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Load .SRT / .VTT Subtitle</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tab 2: Audio Tracks Content */}
+                      {tracksMenuTab === 'audio' && (
+                        <div>
+                          <div className="max-h-48 overflow-y-auto py-1 px-1">
+                            {/* Default / Original Track */}
+                            <button
+                              type="button"
+                              onClick={() => handleSelectAudioTrack('default')}
+                              className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left rounded-lg transition-colors cursor-pointer ${
+                                selectedAudioTrack === 'default'
+                                  ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
+                                  : 'text-zinc-300 hover:text-white hover:bg-white/5'
+                              }`}
+                            >
+                              <span className="truncate pr-2">Original / Default Audio</span>
+                              {selectedAudioTrack === 'default' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                            </button>
+
+                            {/* Detected native audio tracks */}
+                            {audioTracks.map(track => (
+                              <button
+                                key={track.id}
+                                type="button"
+                                onClick={() => handleSelectAudioTrack(track.id)}
+                                className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left rounded-lg transition-colors cursor-pointer ${
+                                  selectedAudioTrack === track.id
+                                    ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
+                                    : 'text-zinc-300 hover:text-white hover:bg-white/5'
+                                }`}
+                              >
+                                <span className="truncate pr-2">{track.label}</span>
+                                {selectedAudioTrack === track.id && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                              </button>
+                            ))}
+
+                            {/* External loaded audio tracks (e.g. Tamil track) */}
+                            {externalAudioTracks.map(track => (
+                              <button
+                                key={track.id}
+                                type="button"
+                                onClick={() => handleSelectAudioTrack(track.id)}
+                                className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left rounded-lg transition-colors cursor-pointer ${
+                                  selectedAudioTrack === track.id
+                                    ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
+                                    : 'text-zinc-300 hover:text-white hover:bg-white/5'
+                                }`}
+                              >
+                                <span className="truncate pr-2 flex items-center gap-1.5 min-w-0">
+                                  <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-800/60 shrink-0">
+                                    AUDIO
+                                  </span>
+                                  <span className="truncate">{track.label}</span>
+                                </span>
+                                {selectedAudioTrack === track.id && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Load External Audio / Headphone sync */}
+                          <div className="p-2 border-t border-white/[0.08] mt-1 space-y-1.5">
+                            <button
+                              type="button"
+                              onClick={() => audioFileInputRef.current?.click()}
+                              className="w-full py-1.5 px-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-emerald-500/30"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Load Tamil / Audio Track</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  if (videoRef.current && 'setSinkId' in videoRef.current) {
+                                    await (videoRef.current as any).setSinkId('');
+                                  }
+                                  if (externalAudioRef.current && 'setSinkId' in externalAudioRef.current) {
+                                    await (externalAudioRef.current as any).setSinkId('');
+                                  }
+                                } catch (err) {
+                                  console.warn('Sync audio sink error:', err);
+                                }
+                              }}
+                              className="w-full py-1.5 px-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-zinc-700/60"
+                              title="Re-route audio to newly connected Bluetooth earpods or headphones"
+                            >
+                              <Headphones className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Re-sync Earpods / Headset</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2145,26 +2394,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 >
                   <PictureInPicture className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
-
-                {/* In-Player Live Chat Button */}
-                {onSendMessage && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsChatOpen(prev => !prev);
-                    }}
-                    className={`p-1 sm:p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
-                      isChatOpen
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-                    }`}
-                    title="Live Chat"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span className="text-[10px] sm:text-[11px] font-medium hidden lg:inline">Chat</span>
-                  </button>
-                )}
 
                 {/* Fullscreen / Landscape (Single Unified Button: auto-rotates on mobile, standard on laptop) */}
                 <button
@@ -2366,7 +2595,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               {reactionsEnabled && onSendReaction && (
                 <div className="px-2.5 py-1.5 border-t border-zinc-800/60 bg-zinc-900/30 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
-                    {['💚', '❤️', '😂', '🔥', '👏', '🍿', '😮'].map((emoji) => (
+                    {['💚', '🍿', '😂', '🔥', '👏'].map((emoji) => (
                       <button
                         key={emoji}
                         type="button"
@@ -2409,6 +2638,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </form>
             </div>
           )}
+
         </>
       )}
     </div>

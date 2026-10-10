@@ -282,50 +282,51 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           </div>
         </div>
 
-        {/* Right Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Right Controls: Unified Single-Line Toolbar Pill */}
+        <div className="flex items-center bg-zinc-900/90 backdrop-blur-xl border border-white/15 rounded-xl p-1 shadow-lg shrink-0">
           {/* Partner Speaking Indicator */}
           {partnerIsSpeaking && (
-            <div className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-white/10 border border-white/20 text-white text-xs font-medium animate-pulse">
-              <Volume2 className="w-3.5 h-3.5 shrink-0 text-white" />
-              <span className="truncate max-w-[90px] sm:max-w-[130px]">
-                {partnerName || 'Partner'}
-              </span>
-            </div>
+            <>
+              <div className="inline-flex items-center gap-1.5 px-2 py-1 text-white text-xs font-medium animate-pulse">
+                <Volume2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                <span className="truncate max-w-[75px] sm:max-w-[120px]">
+                  {partnerName || 'Partner'}
+                </span>
+              </div>
+              <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+            </>
           )}
 
           {/* Quick Voice Mute / Unmute */}
           {room?.settings.voiceChat && (
-            <button
-              type="button"
-              onClick={toggleMute}
-              className={`inline-flex items-center justify-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg font-semibold text-xs transition-all cursor-pointer select-none active:scale-95 ${
-                isMuted
-                  ? 'bg-zinc-900 text-zinc-400 border border-white/10 hover:text-white'
-                  : 'bg-white hover:bg-zinc-200 text-black shadow-sm'
-              }`}
-              title={isMuted ? t('voice.unmute') : t('voice.mute')}
-              aria-label={isMuted ? t('voice.unmute') : t('voice.mute')}
-            >
-              {isMuted ? (
-                <>
-                  <MicOff className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
-                  <span className="hidden sm:inline font-medium">{t('voice.mute')}</span>
-                </>
-              ) : (
-                <>
-                  <Mic className="w-3.5 h-3.5 shrink-0 text-black" />
-                  <span className="hidden sm:inline font-medium">
-                    {isSpeakingLocally ? t('voice.speaking') : t('voice.title')}
-                  </span>
-                </>
-              )}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={toggleMute}
+                className={`p-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                  isMuted
+                    ? 'text-zinc-400 hover:text-white'
+                    : 'text-emerald-400 hover:text-emerald-300'
+                }`}
+                title={isMuted ? t('voice.unmute') : t('voice.mute')}
+                aria-label={isMuted ? t('voice.unmute') : t('voice.mute')}
+              >
+                {isMuted ? (
+                  <MicOff className="w-3.5 h-3.5 text-zinc-400" />
+                ) : (
+                  <Mic className="w-3.5 h-3.5 text-emerald-400" />
+                )}
+                <span className="text-[11px] hidden sm:inline">
+                  {isMuted ? t('voice.mute') : isSpeakingLocally ? t('voice.speaking') : t('voice.title')}
+                </span>
+              </button>
+              <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+            </>
           )}
 
-          {/* Connection Status Badge */}
+          {/* Connection Status & Online Count */}
           <div 
-            className="inline-flex items-center justify-center h-8 px-2 sm:px-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[11px] font-medium text-zinc-300"
+            className="flex items-center gap-1 px-1.5 py-1 text-xs text-zinc-300"
             title={
               connectionStatus === 'CONNECTED'
                 ? t('room.connected')
@@ -337,65 +338,62 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 connectionStatus === 'CONNECTED'
-                  ? 'bg-emerald-400'
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
                   : connectionStatus === 'CONNECTING'
                   ? 'bg-amber-400 animate-pulse'
                   : 'bg-rose-500'
               }`}
             />
-            <span className="ml-1.5 hidden md:inline">
-              {connectionStatus === 'CONNECTED'
-                ? t('room.connected')
-                : connectionStatus === 'CONNECTING'
-                ? t('room.connecting')
-                : t('room.disconnected')}
-            </span>
+            <Users className="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-0.5" />
+            <span className="font-mono text-[11px]">{participantCount}</span>
           </div>
 
-          {/* Online count */}
-          <div className="inline-flex items-center justify-center gap-1.5 h-8 px-2 sm:px-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[11px] font-medium text-zinc-300">
-            <Users className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-            <span>{participantCount}</span>
-            <span className="hidden sm:inline">{t('room.online')}</span>
-          </div>
+          <div className="w-px h-3.5 bg-white/10 mx-0.5" />
 
           {/* Invite Button */}
           <button
             type="button"
             onClick={() => setIsInviteOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg bg-white hover:bg-zinc-200 text-xs font-semibold text-black active:scale-95 transition-all cursor-pointer shadow-sm"
+            className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1 cursor-pointer"
+            title={t('room.invite')}
           >
-            <Share2 className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden xs:inline">{t('room.invite')}</span>
+            <Share2 className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-medium hidden sm:inline">{t('room.invite')}</span>
           </button>
+
+          <div className="w-px h-3.5 bg-white/10 mx-0.5" />
 
           {/* Settings Button */}
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white border border-white/[0.08] transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            title={t('room.settings')}
             aria-label={t('room.settings')}
           >
-            <SettingsIcon className="w-4 h-4 shrink-0" />
+            <SettingsIcon className="w-3.5 h-3.5" />
           </button>
+
+          <div className="w-px h-3.5 bg-white/10 mx-0.5" />
 
           {/* Leave Button */}
           <button
             type="button"
             onClick={handleLeaveConfirm}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.04] hover:bg-red-500/20 text-zinc-400 hover:text-red-400 border border-white/[0.08] transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
             title={t('room.leave')}
           >
-            <LogOut className="w-4 h-4 shrink-0" />
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
 
       {/* Main Watch Area */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2.5 sm:p-4 gap-3 sm:gap-4">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2 sm:p-4 gap-2 sm:gap-4">
         {/* Left Column: Video Viewport & Floating Reactions */}
         <div className="flex-1 flex flex-col min-w-0 h-full relative">
-          <div className="relative flex-1 flex items-center justify-center min-h-0">
+          {/* Dedicated Stable Video Viewport maintaining 16:9 movie view */}
+          <div className="relative w-full aspect-video max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center shrink-0 mx-auto">
             <ReactionOverlay reactions={reactions} />
 
             <VideoPlayer
@@ -424,8 +422,8 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
             />
           </div>
 
-          {/* Mobile Bottom Area: Direct Chat without separate tabs! */}
-          <div className="lg:hidden flex-1 min-h-[190px] max-h-[260px] mt-2.5 overflow-hidden">
+          {/* Mobile Bottom Area: Direct Chat fills remaining height cleanly */}
+          <div className="lg:hidden flex-1 min-h-0 mt-2 overflow-hidden flex flex-col">
             <ChatPanel
               messages={messages}
               currentParticipantId={myParticipantId}
