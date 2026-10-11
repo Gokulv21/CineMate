@@ -279,6 +279,15 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
             <h2 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate max-w-[120px] xs:max-w-[180px] sm:max-w-xs">
               {room?.name || 'Movie Night'}
             </h2>
+            {room?.mode === 'SCREENING' ? (
+              <span className="hidden sm:inline-flex text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 shrink-0">
+                Screening ↔ Viewing
+              </span>
+            ) : (
+              <span className="hidden sm:inline-flex text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+                Viewing ↔ Viewing
+              </span>
+            )}
           </div>
         </div>
 

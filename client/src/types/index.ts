@@ -1,4 +1,5 @@
 export type PlaybackControlMode = 'HOST_ONLY' | 'EVERYONE';
+export type WatchMode = 'DUAL_VIEWING' | 'SCREENING';
 
 export interface RoomSettings {
   playbackControl: PlaybackControlMode;
@@ -45,6 +46,7 @@ export interface ChatMessage {
 export interface Room {
   id: string;
   name: string;
+  mode?: WatchMode;
   hostId: string;
   createdAt: number;
   lastActivityAt: number;

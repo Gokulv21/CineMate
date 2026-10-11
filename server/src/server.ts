@@ -51,15 +51,16 @@ app.get('/api/health', (req, res) => {
 
 // Create Room via HTTP endpoint
 app.post('/api/rooms', (req, res) => {
-  const { hostName, roomName } = req.body;
+  const { hostName, roomName, mode } = req.body;
   if (!hostName || typeof hostName !== 'string' || hostName.trim().length === 0) {
     return res.status(400).json({ error: 'Host name is required' });
   }
 
-  const { room, hostParticipantId } = roomManager.createRoom(hostName, roomName);
+  const { room, hostParticipantId } = roomManager.createRoom(hostName, roomName, mode);
   res.status(201).json({
     roomId: room.id,
     roomName: room.name,
+    mode: room.mode,
     hostParticipantId
   });
 });

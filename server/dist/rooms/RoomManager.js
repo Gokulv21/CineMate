@@ -15,7 +15,7 @@ export class RoomManager {
     /**
      * Create a new room with default settings and empty participants list
      */
-    createRoom(hostName, customRoomName) {
+    createRoom(hostName, customRoomName, mode = 'DUAL_VIEWING') {
         let roomId = generateRoomCode();
         while (this.rooms.has(roomId)) {
             roomId = generateRoomCode();
@@ -38,6 +38,7 @@ export class RoomManager {
         const room = {
             id: roomId,
             name: customRoomName?.trim().slice(0, 50) || 'Movie Night 💚',
+            mode: mode || 'DUAL_VIEWING',
             hostId: hostId,
             createdAt: now,
             lastActivityAt: now,
