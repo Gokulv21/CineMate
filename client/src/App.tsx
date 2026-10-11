@@ -13,6 +13,7 @@ import { API_BASE_URL } from './config/api.js';
 interface ActiveRoomSession {
   roomId: string;
   userName: string;
+  participantId?: string;
 }
 
 export const App: React.FC = () => {
@@ -46,12 +47,12 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  const handleRoomCreated = (roomId: string, userName: string) => {
+  const handleRoomCreated = (roomId: string, userName: string, hostParticipantId?: string) => {
     // Update URL without full reload
     const newUrl = `${window.location.pathname}?room=${roomId}`;
     window.history.pushState({ path: newUrl }, '', newUrl);
 
-    setActiveRoom({ roomId, userName });
+    setActiveRoom({ roomId, userName, participantId: hostParticipantId });
     setIsCreateOpen(false);
   };
 
@@ -86,13 +87,14 @@ export const App: React.FC = () => {
       <WatchRoom
         roomId={activeRoom.roomId}
         userName={activeRoom.userName}
+        participantId={activeRoom.participantId}
         onLeave={handleLeaveRoom}
       />
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#08080a] text-zinc-100 flex flex-col font-sans selection:bg-white/20 selection:text-white">
+    <div className="min-h-screen cinema-ambient-bg text-zinc-100 flex flex-col font-sans selection:bg-rose-500/30 selection:text-white relative">
       <Navbar
         onCreateRoom={() => setIsCreateOpen(true)}
         onJoinRoom={() => setIsJoinOpen(true)}

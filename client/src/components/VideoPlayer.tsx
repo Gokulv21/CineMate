@@ -27,9 +27,10 @@ import {
   Sun,
   Headphones,
   Mic,
-  MicOff
+  MicOff,
+  Tv
 } from 'lucide-react';
-import type { VideoMetadata, ChatMessage, FloatingReaction } from '../types/index.js';
+import type { VideoMetadata, ChatMessage, FloatingReaction, WatchMode } from '../types/index.js';
 import { formatTime } from '../lib/utils.js';
 import { ReactionOverlay } from './ReactionOverlay.js';
 
@@ -121,6 +122,10 @@ interface VideoPlayerProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   isHost?: boolean;
   canControl: boolean;
+  roomMode?: WatchMode;
+  remoteStream?: MediaStream | null;
+  onStartScreeningStream?: (stream: MediaStream) => void;
+  onStopScreeningStream?: () => void;
   partnerMetadata?: VideoMetadata;
   onVideoSelected: (metadata: { fileName: string; duration: number; size?: number }) => void;
   onPlay: () => void;
@@ -150,7 +155,12 @@ interface VideoPlayerProps {
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   videoRef,
+  isHost = false,
   canControl,
+  roomMode = 'DUAL_VIEWING',
+  remoteStream = null,
+  onStartScreeningStream,
+  onStopScreeningStream,
   partnerMetadata,
   onVideoSelected,
   onPlay,
@@ -291,6 +301,60 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     partnerMetadata.duration > 0 &&
     Math.abs(duration - partnerMetadata.duration) > 3.0;
 
+  const [showAutoplayPrompt, setShowAutoplayPrompt] = useState(false);
+
+  // When partner receives remote screening stream
+  useEffect(() => {
+    if (remoteStream && videoRef.current) {
+      videoRef.current.srcObject = remoteStream;
+      videoRef.current.play().then(() => {
+        setShowAutoplayPrompt(false);
+      }).catch(e => {
+        console.warn('[PARTNER] Autoplay waiting for user gesture:', e);
+        setShowAutoplayPrompt(true);
+      });
+      setIsPlaying(true);
+      setIsLoadingVideo(false);
+      setIsBuffering(false);
+    }
+  }, [remoteStream, videoRef]);
+
+  // Sync partner metadata when screening
+  useEffect(() => {
+    if (partnerMetadata && roomMode === 'SCREENING' && !isHost) {
+      if (partnerMetadata.fileName) setFileName(partnerMetadata.fileName);
+      if (partnerMetadata.duration) setDuration(partnerMetadata.duration);
+    }
+  }, [partnerMetadata, roomMode, isHost]);
+
+  // Host DisplayMedia Screen / Tab Share fallback
+  const handleStartDisplayMedia = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30, max: 60 } },
+        audio: true
+      });
+      if (stream) {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+        setVideoSrc('screening-active');
+        setFileName('Live Screen Stream');
+        if (onStartScreeningStream) {
+          onStartScreeningStream(stream);
+        }
+        onVideoSelected({
+          fileName: 'Live Screen Stream',
+          duration: 7200,
+          size: 0
+        });
+      }
+    } catch (err) {
+      console.warn('[SCREENING] Screen share cancelled or error:', err);
+    }
+  };
+
   // Handle local video file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -298,6 +362,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     if (videoSrc) {
       URL.revokeObjectURL(videoSrc);
+    }
+    if (onStopScreeningStream) {
+      onStopScreeningStream();
     }
 
     setVideoErrorMessage(null);
@@ -320,6 +387,41 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     setDuration(video.duration);
     setIsLoadingVideo(false);
+
+    if (roomMode === 'SCREENING' && isHost && videoRef.current && onStartScreeningStream) {
+      try {
+        const videoEl = videoRef.current;
+        const stream = (videoEl as any).captureStream
+          ? (videoEl as any).captureStream(30)
+          : (videoEl as any).mozCaptureStream
+          ? (videoEl as any).mozCaptureStream(30)
+          : null;
+        if (stream) {
+          // If stream has no audio track, capture audio via Web Audio API
+          if (stream.getAudioTracks().length === 0) {
+            try {
+              const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+              if (AudioCtx) {
+                const audioCtx = new AudioCtx();
+                const source = audioCtx.createMediaElementSource(videoEl);
+                const destination = audioCtx.createMediaStreamDestination();
+                source.connect(destination);
+                source.connect(audioCtx.destination);
+                const movieAudioTrack = destination.stream.getAudioTracks()[0];
+                if (movieAudioTrack) {
+                  stream.addTrack(movieAudioTrack);
+                }
+              }
+            } catch (aErr) {
+              console.warn('[SCREENING] Web Audio track capture notice:', aErr);
+            }
+          }
+          onStartScreeningStream(stream);
+        }
+      } catch (err) {
+        console.warn('[SCREENING] captureStream error:', err);
+      }
+    }
 
     // Scan for native audio tracks if supported by browser
     try {
@@ -1418,36 +1520,95 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         className="hidden"
       />
 
-      {!videoSrc ? (
-        <div className="flex flex-col items-center justify-center p-8 text-center max-w-md animate-in fade-in zoom-in-95 duration-200">
-          <div 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-dashed border-white/20 hover:border-white/40 flex items-center justify-center mb-4 cursor-pointer group/pick transition-all hover:bg-white/[0.08]"
-          >
-            <Film className="w-7 h-7 text-zinc-400 group-hover/pick:text-white transition-all" />
+      {!videoSrc && !remoteStream ? (
+        roomMode === 'SCREENING' && !isHost ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center max-w-md animate-in fade-in duration-200">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-rose-500/20 border border-violet-500/40 flex items-center justify-center mb-4 text-violet-300 shadow-[0_0_25px_rgba(139,92,246,0.35)] animate-pulse">
+              <Tv className="w-8 h-8" />
+            </div>
+            
+            <span className="text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/40 mb-3 shadow-[0_0_12px_rgba(139,92,246,0.2)]">
+              SCREENING ↔ VIEWING
+            </span>
+            
+            <h3 className="text-xl font-bold text-white tracking-tight">
+              {partnerMetadata?.fileName ? `Host Selected "${partnerMetadata.fileName}"` : 'Waiting for Host to start screening...'}
+            </h3>
+            
+            <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+              {partnerMetadata?.fileName
+                ? 'Connecting to live movie stream... Playback will begin as soon as Host plays!'
+                : `${partnerName || 'Host'} is selecting the movie to screen. Sit back and relax — once they play, it will appear here automatically!`}
+            </p>
           </div>
-          
-          <h3 className="text-xl font-bold text-white tracking-tight">
-            {t('video.chooseMovie')}
-          </h3>
-          <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-            {t('video.localNotice')}
-          </p>
+        ) : (
+          <div className="flex flex-col items-center justify-center p-8 text-center max-w-md animate-in fade-in zoom-in-95 duration-200">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-500/10 to-violet-500/10 border border-dashed border-rose-500/30 hover:border-rose-400 flex items-center justify-center mb-4 cursor-pointer group/pick transition-all hover:bg-rose-500/15 shadow-[0_0_20px_rgba(244,63,94,0.15)]"
+            >
+              <Film className="w-7 h-7 text-rose-300 group-hover/pick:text-white transition-all" />
+            </div>
+            
+            <h3 className="text-xl font-bold text-white tracking-tight">
+              {roomMode === 'SCREENING' ? 'Select Movie to Screen to Partner' : t('video.chooseMovie')}
+            </h3>
+            <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+              {roomMode === 'SCREENING'
+                ? `Choose a movie from your device. CineMate will stream it directly to ${partnerName || 'your partner'} so they don't need to download anything!`
+                : t('video.localNotice')}
+            </p>
 
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="mt-6 px-6 py-2.5 rounded-xl font-semibold text-xs text-black bg-white hover:bg-zinc-200 shadow-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
-          >
-            <Upload className="w-4 h-4" />
-            <span>{t('video.chooseFileButton')}</span>
-          </button>
-        </div>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className={`px-6 py-2.5 rounded-xl font-bold text-xs text-white shadow-lg shadow-rose-950/60 flex items-center gap-2 active:scale-95 transition-all cursor-pointer ${
+                  roomMode === 'SCREENING'
+                    ? 'bg-gradient-to-r from-violet-600 via-rose-600 to-rose-500 hover:brightness-110 shadow-violet-950/60'
+                    : 'cinema-btn-primary'
+                }`}
+              >
+                <Upload className="w-4 h-4" />
+                <span>{roomMode === 'SCREENING' ? 'Choose Movie File' : t('video.chooseFileButton')}</span>
+              </button>
+
+              {roomMode === 'SCREENING' && isHost && (
+                <button
+                  type="button"
+                  onClick={handleStartDisplayMedia}
+                  className="px-4 py-2.5 rounded-xl font-semibold text-xs text-violet-200 hover:text-white bg-violet-950/40 hover:bg-violet-900/50 border border-violet-500/30 flex items-center gap-2 active:scale-95 transition-all cursor-pointer shadow-sm"
+                  title="Share CineMate Tab or Player Window"
+                >
+                  <Tv className="w-4 h-4 text-violet-400" />
+                  <span>Share Tab / Screen</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )
       ) : (
         <>
+          {showAutoplayPrompt && (
+            <div
+              onClick={() => {
+                videoRef.current?.play().then(() => setShowAutoplayPrompt(false));
+              }}
+              className="absolute inset-0 z-40 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center gap-3.5 cursor-pointer p-4 text-center select-none"
+            >
+              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-rose-600 to-violet-600 text-white flex items-center justify-center shadow-[0_0_35px_rgba(244,63,94,0.6)] animate-pulse border border-rose-400/40">
+                <Play className="w-8 h-8 fill-white ml-1" />
+              </div>
+              <span className="text-base font-bold text-white tracking-tight">Tap to Watch Live Stream</span>
+              <span className="text-xs text-zinc-300 max-w-xs leading-relaxed">
+                {partnerName || 'Host'} is playing {fileName ? `"${fileName}"` : 'the movie'}. Tap anywhere to start audio & video!
+              </span>
+            </div>
+          )}
+
           <video
             ref={videoRef}
-            src={videoSrc}
+            src={remoteStream ? undefined : (videoSrc || undefined)}
             playsInline
             preload="metadata"
             style={{ filter: brightness !== 1.0 ? `brightness(${brightness})` : undefined }}
@@ -1659,7 +1820,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 {canControl && (
                   <button
                     onClick={onReplay}
-                    className="px-5 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                    className="cinema-btn-primary px-5 py-2.5 rounded-xl text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-rose-950/60 transition-all cursor-pointer active:scale-95"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>{t('video.replay')}</span>
@@ -1667,7 +1828,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 )}
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium text-xs flex items-center gap-2 transition-all cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/10 text-zinc-200 font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95"
                 >
                   <Upload className="w-4 h-4" />
                   <span>{t('video.chooseAnother')}</span>
@@ -2051,7 +2212,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 resetControlsTimeout();
               }}
               disabled={!canControl}
-              className="pointer-events-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105"
+              className="pointer-events-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-white via-zinc-100 to-rose-100 hover:from-white hover:to-white text-black flex items-center justify-center shadow-[0_0_35px_rgba(244,63,94,0.35)] border border-rose-500/25 backdrop-blur-md transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -2106,7 +2267,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
               <div className="w-full h-1.5 group-hover/scrub:h-2 bg-white/20 rounded-full transition-all overflow-hidden relative">
                 <div
-                  className="h-full bg-white rounded-full"
+                  className="h-full bg-gradient-to-r from-rose-600 via-rose-500 to-violet-500 rounded-full shadow-[0_0_10px_rgba(244,63,94,0.7)]"
                   style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
                 />
               </div>

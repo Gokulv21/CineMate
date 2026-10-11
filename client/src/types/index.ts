@@ -48,6 +48,7 @@ export interface Room {
   name: string;
   mode?: WatchMode;
   hostId: string;
+  creatorName?: string;
   createdAt: number;
   lastActivityAt: number;
   participants: Participant[];

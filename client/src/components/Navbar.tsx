@@ -29,8 +29,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#08080a]/85 backdrop-blur-md border-b border-white/[0.06]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-15 flex items-center justify-between">
+    <header className="sticky top-0 z-40 w-full bg-[#0a0912]/80 backdrop-blur-xl border-b border-white/[0.08] shadow-[0_4px_30px_rgba(0,0,0,0.6)]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand */}
         <Logo
           size="md"
@@ -38,22 +38,22 @@ export const Navbar: React.FC<NavbarProps> = ({
         />
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden md:flex items-center gap-7">
           <button
             onClick={() => scrollToSection('how-it-works')}
-            className="text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            className="text-xs font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer tracking-wide"
           >
             {t('nav.howItWorks')}
           </button>
           <button
             onClick={() => scrollToSection('features')}
-            className="text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            className="text-xs font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer tracking-wide"
           >
             {t('nav.features')}
           </button>
           <button
             onClick={() => scrollToSection('privacy')}
-            className="text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            className="text-xs font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer tracking-wide"
           >
             {t('nav.privacy')}
           </button>
@@ -66,7 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {!isInstalled && onInstallApp && (
             <button
               onClick={onInstallApp}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
               title="Install CineMate App"
             >
               <Download className="w-4 h-4" />
@@ -75,17 +75,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <button
             onClick={onJoinRoom}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center gap-1.5"
+            className="cinema-btn-secondary px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer flex items-center gap-2"
           >
-            <LogIn className="w-3.5 h-3.5 text-zinc-400" />
+            <LogIn className="w-3.5 h-3.5 text-rose-400" />
             <span>{t('nav.joinRoom')}</span>
           </button>
 
           <button
             onClick={onCreateRoom}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-black bg-white hover:bg-zinc-200 active:scale-98 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+            className="cinema-btn-primary px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             <span>{t('nav.createRoom')}</span>
           </button>
         </div>

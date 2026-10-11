@@ -16,6 +16,7 @@ class RoomWebSocketService {
 
   private currentRoomId: string | null = null;
   private currentUserName: string | null = null;
+  private currentParticipantId: string | null = null;
 
   public status: ConnectionStatus = 'DISCONNECTED';
 
@@ -23,7 +24,7 @@ class RoomWebSocketService {
     return WS_BASE_URL;
   }
 
-  public connect(roomId: string, userName: string) {
+  public connect(roomId: string, userName: string, participantId?: string) {
     const cleanRoomId = roomId.trim().toUpperCase();
     const cleanUserName = userName.trim();
 
@@ -39,6 +40,7 @@ class RoomWebSocketService {
 
     this.currentRoomId = cleanRoomId;
     this.currentUserName = cleanUserName;
+    this.currentParticipantId = participantId || null;
     this.isIntentionallyClosed = false;
 
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
@@ -60,6 +62,7 @@ class RoomWebSocketService {
             type: 'JOIN_ROOM',
             roomId: this.currentRoomId,
             userName: this.currentUserName,
+            participantId: this.currentParticipantId || undefined
           });
         }
       };

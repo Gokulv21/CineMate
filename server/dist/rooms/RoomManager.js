@@ -15,7 +15,7 @@ export class RoomManager {
     /**
      * Create a new room with default settings and empty participants list
      */
-    createRoom(hostName, customRoomName, mode = 'DUAL_VIEWING') {
+    createRoom(hostName, customRoomName, mode = 'DUAL_VIEWING', playbackControl = 'HOST_ONLY') {
         let roomId = generateRoomCode();
         while (this.rooms.has(roomId)) {
             roomId = generateRoomCode();
@@ -23,7 +23,7 @@ export class RoomManager {
         const hostId = generateId();
         const now = Date.now();
         const defaultSettings = {
-            playbackControl: 'HOST_ONLY',
+            playbackControl: playbackControl || 'HOST_ONLY',
             autoSync: true,
             voiceChat: true,
             chatEnabled: true,
@@ -40,6 +40,7 @@ export class RoomManager {
             name: customRoomName?.trim().slice(0, 50) || 'Movie Night 💚',
             mode: mode || 'DUAL_VIEWING',
             hostId: hostId,
+            creatorName: hostName.trim(),
             createdAt: now,
             lastActivityAt: now,
             participants: [],
@@ -75,18 +76,43 @@ export class RoomManager {
                 return { room, participant: existing };
             }
         }
-        const isFirst = room.participants.length === 0;
-        const participantId = isFirst && room.hostId ? room.hostId : (existingParticipantId || generateId());
+        // Determine participant ID and host status reliably
+        let participantId;
+        let isHost = false;
+        const isCreatorName = !!room.creatorName && userName.trim().toLowerCase() === room.creatorName.trim().toLowerCase();
+        const hostAlreadyJoined = room.participants.some(p => p.id === room.hostId || p.isHost);
+        if (existingParticipantId && existingParticipantId === room.hostId) {
+            // The creator is joining with their host token
+            participantId = room.hostId;
+            isHost = true;
+        }
+        else if (existingParticipantId) {
+            participantId = existingParticipantId;
+            isHost = room.hostId === existingParticipantId;
+        }
+        else if (isCreatorName && !hostAlreadyJoined) {
+            // Creator joining by matching name when host has not joined yet
+            participantId = room.hostId;
+            isHost = true;
+        }
+        else if (room.participants.length === 0 && !room.creatorName) {
+            // Room was created without pre-assigned creator name
+            participantId = room.hostId || generateId();
+            room.hostId = participantId;
+            isHost = true;
+        }
+        else {
+            // Normal guest joining room code
+            participantId = generateId();
+            isHost = false;
+        }
         const participant = {
             id: participantId,
-            name: userName.trim().slice(0, 30) || (isFirst ? 'Host' : 'Guest'),
+            name: userName.trim().slice(0, 30) || (isHost ? 'Host' : 'Guest'),
             joinedAt: now,
-            isHost: isFirst || room.hostId === participantId,
+            isHost,
             isMuted: true
         };
-        if (isFirst) {
-            room.hostId = participant.id;
-        }
         room.participants.push(participant);
         room.lastActivityAt = now;
         this.emptySince.delete(room.id);

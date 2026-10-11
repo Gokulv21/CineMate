@@ -12,15 +12,15 @@ export const Logo: React.FC<LogoProps> = ({
   onClick
 }) => {
   const iconSizes = {
-    sm: 'w-7 h-7',
-    md: 'w-8 h-8',
-    lg: 'w-10 h-10'
+    sm: 'w-6 h-6',
+    md: 'w-7 h-7 sm:w-8 sm:h-8',
+    lg: 'w-9 h-9 sm:w-10 sm:h-10'
   };
 
   const textSizes = {
     sm: 'text-base',
-    md: 'text-lg',
-    lg: 'text-xl'
+    md: 'text-lg sm:text-xl',
+    lg: 'text-2xl sm:text-3xl'
   };
 
   return (
@@ -28,26 +28,42 @@ export const Logo: React.FC<LogoProps> = ({
       onClick={onClick}
       className={`inline-flex items-center gap-2.5 select-none ${onClick ? 'cursor-pointer group' : ''} ${className}`}
     >
-      {/* Simple, Elegant Minimalist Cinema Mark */}
-      <div className={`relative ${iconSizes[size]} shrink-0 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center transition-all duration-200 group-hover:border-white/20 group-hover:bg-zinc-800/80 shadow-sm`}>
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-4 h-4 text-white"
-        >
-          {/* Minimalist Dual Film Frame / Two viewers in sync */}
-          <rect x="3" y="5" width="11" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.75" />
-          <rect x="10" y="5" width="11" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.75" strokeOpacity="0.45" />
-          {/* Subtle center shared spark / play point */}
-          <polygon points="7.5,9.5 7.5,14.5 11.5,12" fill="currentColor" />
-        </svg>
-      </div>
+      {/* Raw Cinema Emblem (No bounding box / cards) */}
+      <svg
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className={`${iconSizes[size]} shrink-0 transition-transform duration-300 group-hover:scale-110 drop-shadow-[0_0_12px_rgba(244,63,94,0.6)]`}
+      >
+        <defs>
+          <linearGradient id="cm-raw-grad" x1="2" y1="2" x2="26" y2="26" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#f43f5e" />
+            <stop offset="0.6" stopColor="#e11d48" />
+            <stop offset="1" stopColor="#a855f7" />
+          </linearGradient>
+        </defs>
+        {/* Twin Intertwined Film Reels (Representing Dual Sync / Watching Together) */}
+        <circle cx="10" cy="14" r="8" stroke="url(#cm-raw-grad)" strokeWidth="2.2" />
+        <circle cx="18" cy="14" r="8" stroke="url(#cm-raw-grad)" strokeWidth="2.2" strokeOpacity="0.8" />
+        {/* Film reel accents */}
+        <circle cx="7" cy="14" r="1.2" fill="#f43f5e" />
+        <circle cx="21" cy="14" r="1.2" fill="#a855f7" />
+        {/* Play Glyph in Core */}
+        <path d="M12.5 10.5L18.5 14L12.5 17.5V10.5Z" fill="url(#cm-raw-grad)" />
+      </svg>
 
-      {/* Clean, Refined Wordmark */}
-      <span className={`font-semibold tracking-tight text-white font-sans ${textSizes[size]}`}>
-        Cine<span className="text-zinc-400 font-normal">Mate</span>
-      </span>
+      {/* Brand Title with "Private Theatre" Subtitle */}
+      <div className="flex flex-col text-left leading-none">
+        <div className={`font-black tracking-tight font-sans ${textSizes[size]} flex items-center`}>
+          <span className="text-white">Cine</span>
+          <span className="bg-gradient-to-r from-rose-500 via-pink-400 to-violet-400 bg-clip-text text-transparent">
+            Mate
+          </span>
+        </div>
+        <span className="text-[7.5px] sm:text-[8.5px] font-bold tracking-[0.24em] uppercase text-rose-400/90 mt-1">
+          Private Theatre
+        </span>
+      </div>
     </div>
   );
 };
