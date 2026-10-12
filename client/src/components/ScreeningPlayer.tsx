@@ -92,6 +92,8 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
   const selectedFileRef = useRef<string>('');
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaElementSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const audioDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const capturedStreamRef = useRef<MediaStream | null>(null);
 
   // Player state
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -101,6 +103,7 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
   const [duration, setDuration] = useState<number>(0);
   const [volume, setVolume] = useState<number>(1.0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [viewerMuted, setViewerMuted] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [fitMode, setFitMode] = useState<'contain' | 'cover' | 'fill'>('contain');
   const [showControls, setShowControls] = useState<boolean>(true);
@@ -163,6 +166,17 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
     if (!video || !isHost || isScreenSharing) return;
 
     try {
+      // Reuse active captured stream if already established
+      if (capturedStreamRef.current) {
+        const tracks = capturedStreamRef.current.getTracks();
+        if (tracks.length > 0 && tracks.every(t => t.readyState === 'live')) {
+          if (onStartScreeningStream) {
+            onStartScreeningStream(capturedStreamRef.current);
+          }
+          return;
+        }
+      }
+
       const stream = (video as any).captureStream
         ? (video as any).captureStream(30)
         : (video as any).mozCaptureStream
@@ -170,8 +184,8 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
         : null;
 
       if (stream) {
-        // If captureStream does not have an audio track, route via Web Audio API if not already routed
-        if (stream.getAudioTracks().length === 0 && !mediaElementSourceRef.current) {
+        // If captureStream does not have an audio track, route via Web Audio API
+        if (stream.getAudioTracks().length === 0) {
           try {
             const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
             if (AudioCtx) {
@@ -180,21 +194,27 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
               if (ctx.state === 'suspended') {
                 ctx.resume().catch(() => {});
               }
-              const source = ctx.createMediaElementSource(video);
-              mediaElementSourceRef.current = source;
-              const dest = ctx.createMediaStreamDestination();
-              source.connect(dest);
-              source.connect(ctx.destination);
-              const audioTrack = dest.stream.getAudioTracks()[0];
-              if (audioTrack) {
-                stream.addTrack(audioTrack);
+              if (!mediaElementSourceRef.current) {
+                const source = ctx.createMediaElementSource(video);
+                mediaElementSourceRef.current = source;
+                const dest = ctx.createMediaStreamDestination();
+                audioDestinationRef.current = dest;
+                source.connect(dest);
+                source.connect(ctx.destination);
+              }
+              if (audioDestinationRef.current) {
+                const audioTrack = audioDestinationRef.current.stream.getAudioTracks()[0];
+                if (audioTrack && !stream.getAudioTracks().includes(audioTrack)) {
+                  stream.addTrack(audioTrack);
+                }
               }
             }
           } catch (e) {
-            console.warn('[SCREENING] Audio fallback notice:', e);
+            console.warn('[SCREENING] Audio routing notice:', e);
           }
         }
 
+        capturedStreamRef.current = stream;
         console.log('[SCREENING HOST] Broadcasting local stream tracks:', stream.getTracks().map((t: MediaStreamTrack) => `${t.kind}:${t.readyState}`));
         if (onStartScreeningStream) {
           onStartScreeningStream(stream);
@@ -209,6 +229,11 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (capturedStreamRef.current) {
+      capturedStreamRef.current.getTracks().forEach(t => t.stop());
+      capturedStreamRef.current = null;
+    }
 
     if (videoSrc && videoSrc !== 'screen-share-active') {
       URL.revokeObjectURL(videoSrc);
@@ -279,6 +304,10 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
 
   // Stop Screening
   const handleStopScreening = () => {
+    if (capturedStreamRef.current) {
+      capturedStreamRef.current.getTracks().forEach(t => t.stop());
+      capturedStreamRef.current = null;
+    }
     if (videoSrc && videoSrc !== 'screen-share-active') {
       URL.revokeObjectURL(videoSrc);
     }
@@ -399,9 +428,42 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
       {/* Floating Reactions */}
       {reactionsEnabled && <ReactionOverlay reactions={reactions} />}
 
+      {/* Permanent Video Element in DOM so ref and srcObject are never detached */}
+      <video
+        ref={videoRef}
+        src={isHost ? (!isScreenSharing ? (videoSrc || undefined) : undefined) : undefined}
+        playsInline
+        autoPlay={!isHost}
+        muted={!isHost ? viewerMuted : isMuted}
+        preload="metadata"
+        className={`${getFitClass()} cursor-pointer transition-all duration-300 ${
+          (isHost && !videoSrc) || (!isHost && !remoteStream) ? 'hidden' : 'block'
+        }`}
+        onLoadedMetadata={handleLoadedMetadata}
+        onTimeUpdate={() => {
+          if (isHost && videoRef.current) {
+            setCurrentTime(videoRef.current.currentTime);
+          }
+        }}
+        onPlay={() => {
+          setIsPlaying(true);
+          if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+            audioContextRef.current.resume().catch(() => {});
+          }
+          if (videoEventHandlers?.onPlay) videoEventHandlers.onPlay();
+        }}
+        onPause={() => {
+          setIsPlaying(false);
+          if (videoEventHandlers?.onPause) videoEventHandlers.onPause();
+        }}
+        onEnded={() => {
+          setIsPlaying(false);
+        }}
+      />
+
       {/* STATE 1: HOST SETUP (No movie selected yet) */}
-      {isHost && !videoSrc ? (
-        <div className="flex flex-col items-center justify-center p-6 text-center max-w-lg animate-in fade-in zoom-in-95 duration-200">
+      {isHost && !videoSrc && (
+        <div className="flex flex-col items-center justify-center p-6 text-center max-w-lg animate-in fade-in zoom-in-95 duration-200 z-10">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/25 via-pink-500/15 to-violet-500/25 border border-purple-500/40 flex items-center justify-center mb-4 text-purple-300 shadow-[0_0_30px_rgba(168,85,247,0.4)] animate-pulse">
             <Radio className="w-8 h-8" />
           </div>
@@ -448,9 +510,11 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
             <span>Encrypted WebRTC P2P direct stream • Zero server storage</span>
           </div>
         </div>
-      ) : !isHost && !remoteStream ? (
-        /* STATE 2: VIEWER WAITING LOUNGE (Partner waiting for Host to stream) */
-        <div className="flex flex-col items-center justify-center p-6 text-center max-w-md animate-in fade-in duration-200">
+      )}
+
+      {/* STATE 2: VIEWER WAITING LOUNGE (Partner waiting for Host to stream) */}
+      {!isHost && !remoteStream && (
+        <div className="flex flex-col items-center justify-center p-6 text-center max-w-md animate-in fade-in duration-200 z-10">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/40 flex items-center justify-center mb-4 text-purple-300 shadow-[0_0_30px_rgba(168,85,247,0.35)] animate-pulse">
             <Tv className="w-8 h-8" />
           </div>
@@ -476,14 +540,20 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
             <span>Live Stream Receiver Ready • 0 MB Download Needed</span>
           </div>
         </div>
-      ) : (
-        /* STATE 3: ACTIVE SCREENING PLAYBACK (Host streaming or Viewer watching) */
+      )}
+
+      {/* STATE 3: ACTIVE SCREENING PLAYBACK (Host streaming or Viewer watching) */}
+      {Boolean((isHost && videoSrc) || (!isHost && remoteStream)) && (
         <>
           {/* Autoplay unlock prompt for Viewer */}
           {!isHost && showAutoplayPrompt && (
             <div
               onClick={() => {
-                videoRef.current?.play().then(() => setShowAutoplayPrompt(false));
+                setViewerMuted(false);
+                if (videoRef.current) {
+                  videoRef.current.muted = false;
+                  videoRef.current.play().then(() => setShowAutoplayPrompt(false)).catch(() => {});
+                }
               }}
               className="absolute inset-0 z-40 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center gap-3.5 cursor-pointer p-4 text-center select-none"
             >
@@ -497,37 +567,24 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
             </div>
           )}
 
-          <video
-            ref={videoRef}
-            src={isHost ? (!isScreenSharing ? (videoSrc || undefined) : undefined) : undefined}
-            playsInline
-            autoPlay={!isHost}
-            preload="metadata"
-            className={`${getFitClass()} cursor-pointer transition-all duration-300`}
-            onLoadedMetadata={handleLoadedMetadata}
-            onTimeUpdate={() => {
-              if (isHost && videoRef.current) {
-                setCurrentTime(videoRef.current.currentTime);
-              }
-            }}
-            onPlay={() => {
-              setIsPlaying(true);
-              if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-                audioContextRef.current.resume().catch(() => {});
-              }
-              if (isHost && !isScreenSharing) {
-                broadcastLocalStream();
-              }
-              if (videoEventHandlers?.onPlay) videoEventHandlers.onPlay();
-            }}
-            onPause={() => {
-              setIsPlaying(false);
-              if (videoEventHandlers?.onPause) videoEventHandlers.onPause();
-            }}
-            onEnded={() => {
-              setIsPlaying(false);
-            }}
-          />
+          {/* Quick Unmute Audio Pill for Viewer on Mobile / Chrome */}
+          {!isHost && viewerMuted && !showAutoplayPrompt && (
+            <button
+              type="button"
+              onClick={() => {
+                setViewerMuted(false);
+                if (videoRef.current) {
+                  videoRef.current.muted = false;
+                  videoRef.current.play().catch(() => {});
+                }
+              }}
+              className="absolute bottom-20 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-[0_0_25px_rgba(244,63,94,0.7)] flex items-center gap-2 cursor-pointer animate-bounce border border-rose-400/40"
+            >
+              <VolumeX className="w-4 h-4 text-white" />
+              <span>Tap to Unmute Live Movie Sound</span>
+            </button>
+          )}
+
 
           {/* Top Live Screening Status Pill */}
           <div className={`absolute top-3 left-3 z-30 transition-opacity duration-300 flex items-center gap-2 ${

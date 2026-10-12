@@ -526,6 +526,18 @@ export function useWebRTCVoice({
         const { from, offer } = msg;
         try {
           const pc = getOrCreatePeerConnection(from);
+
+          // Perfect Negotiation: Handle offer collision / glare
+          if (pc.signalingState !== 'stable') {
+            const isPolite = !isHostRef.current; // Viewer is polite, host is impolite
+            if (!isPolite) {
+              console.warn(`[WEBRTC] Host ignoring colliding offer from ${from}`);
+              return;
+            }
+            console.log(`[WEBRTC] Viewer rolling back local offer to accept incoming offer from ${from}`);
+            await pc.setLocalDescription({ type: 'rollback' });
+          }
+
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
           await drainIceCandidates(from, pc);
 
@@ -555,15 +567,19 @@ export function useWebRTCVoice({
             }
           }
 
-          // Ensure transceiver direction
+          // Ensure transceiver directions
           const transceivers = pc.getTransceivers();
-          transceivers.forEach(t => {
-            if (t.receiver.track?.kind === 'audio') {
-              t.direction = 'sendrecv';
-            } else if (t.receiver.track?.kind === 'video') {
-              t.direction = (isScreeningModeRef.current && isHostRef.current) ? 'sendonly' : 'recvonly';
-            }
-          });
+          const audioTransceivers = transceivers.filter(t => t.receiver.track?.kind === 'audio');
+          if (audioTransceivers[0]) {
+            audioTransceivers[0].direction = 'sendrecv'; // mic voice chat
+          }
+          if (audioTransceivers[1]) {
+            audioTransceivers[1].direction = isHostRef.current ? 'sendonly' : 'recvonly'; // movie audio
+          }
+          const videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video');
+          if (videoTransceiver) {
+            videoTransceiver.direction = (isScreeningModeRef.current && isHostRef.current) ? 'sendonly' : 'recvonly';
+          }
 
           const answer = await pc.createAnswer();
           const enhancedSdp = enhanceSdpForVoice(answer.sdp || '');
@@ -699,16 +715,16 @@ export function useWebRTCVoice({
     });
   }, [screeningStream, callPeer, isScreeningMode, isHost]);
 
-  // Mode switch: renegotiate peer connections when entering screening mode
+  // Mode switch: renegotiate peer connections when entering screening mode (Host only)
   useEffect(() => {
-    if (isScreeningMode) {
+    if (isScreeningMode && isHost) {
       participantIds.forEach((targetId) => {
         if (targetId !== myParticipantId) {
           callPeer(targetId);
         }
       });
     }
-  }, [isScreeningMode, participantIds, myParticipantId, callPeer]);
+  }, [isScreeningMode, isHost, participantIds, myParticipantId, callPeer]);
 
   useEffect(() => {
     if (!enabled || !myParticipantId) return;

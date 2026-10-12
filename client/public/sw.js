@@ -1,9 +1,9 @@
-const CACHE_NAME = 'cinemate-pwa-v1';
+const CACHE_NAME = 'cinemate-pwa-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/pwa-icon.svg',
+  '/logo.png',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
   '/apple-touch-icon.png'
