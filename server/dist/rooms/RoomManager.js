@@ -203,6 +203,14 @@ export class RoomManager {
         room.lastActivityAt = Date.now();
         return room.settings;
     }
+    updateMode(roomId, participantId, mode) {
+        const room = this.getRoom(roomId);
+        if (!room || room.hostId !== participantId)
+            return null;
+        room.mode = mode;
+        room.lastActivityAt = Date.now();
+        return room.mode;
+    }
     transferHost(roomId, currentHostId, newHostId) {
         const room = this.getRoom(roomId);
         if (!room || room.hostId !== currentHostId)

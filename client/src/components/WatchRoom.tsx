@@ -21,7 +21,8 @@ import type {
 import { wsService } from '../services/websocket.js';
 import { useWebRTCVoice } from '../hooks/useWebRTCVoice.js';
 import { useVideoSync } from '../hooks/useVideoSync.js';
-import { VideoPlayer } from './VideoPlayer.js';
+import { DualViewingPlayer } from './DualViewingPlayer.js';
+import { ScreeningPlayer } from './ScreeningPlayer.js';
 import { ChatPanel } from './ChatPanel.js';
 import { VoiceControls } from './VoiceControls.js';
 import { SettingsModal } from './SettingsModal.js';
@@ -149,6 +150,11 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           break;
         }
 
+        case 'MODE_UPDATED': {
+          setRoom(prev => prev ? { ...prev, mode: msg.mode } : null);
+          break;
+        }
+
         case 'PARTICIPANT_MUTE_UPDATED': {
           setRoom(prev => {
             if (!prev) return null;
@@ -202,7 +208,9 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
   const [screeningStream, setScreeningStream] = useState<MediaStream | null>(null);
   const [remoteScreeningStream, setRemoteScreeningStream] = useState<MediaStream | null>(null);
 
+  const isScreeningMode = room?.mode === 'SCREENING';
   const participantIds = room?.participants.map(p => p.id) || [];
+
   const {
     voiceStatus,
     isMuted,
@@ -215,9 +223,21 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
     myParticipantId,
     participantIds,
     enabled: room?.settings.voiceChat ?? true,
+    isScreeningMode,
+    isHost,
     screeningStream,
     onRemoteScreeningStream: setRemoteScreeningStream
   });
+
+  const handleToggleMode = useCallback(() => {
+    if (!isHost || !room) return;
+    const nextMode = room.mode === 'SCREENING' ? 'DUAL_VIEWING' : 'SCREENING';
+    wsService.sendMessage({
+      type: 'UPDATE_MODE',
+      mode: nextMode
+    });
+    setRoom(prev => prev ? { ...prev, mode: nextMode } : null);
+  }, [isHost, room]);
 
   // Smart Audio Ducking: When partner speaks, duck video volume to 35% so their voice is crystal clear
   const previousVolumeRef = useRef<number>(1.0);
@@ -297,13 +317,29 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
               {room?.name || 'Movie Night'}
             </h2>
             {room?.mode === 'SCREENING' ? (
-              <span className="hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)] shrink-0">
-                Screening ↔ Viewing
-              </span>
+              <button
+                type="button"
+                onClick={isHost ? handleToggleMode : undefined}
+                className={`hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)] shrink-0 items-center gap-1 ${
+                  isHost ? 'hover:bg-purple-500/35 cursor-pointer active:scale-95 transition-all' : 'cursor-default'
+                }`}
+                title={isHost ? 'Host: Click to switch to Dual Viewing (Both have movie file)' : 'Screening Mode: Host streams to Viewer'}
+              >
+                <span>Screening ↔ Viewing</span>
+                {isHost && <span className="text-[8px] bg-purple-500/40 px-1 rounded text-white">Switch</span>}
+              </button>
             ) : (
-              <span className="hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.3)] shrink-0">
-                Viewing ↔ Viewing
-              </span>
+              <button
+                type="button"
+                onClick={isHost ? handleToggleMode : undefined}
+                className={`hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.3)] shrink-0 items-center gap-1 ${
+                  isHost ? 'hover:bg-rose-500/35 cursor-pointer active:scale-95 transition-all' : 'cursor-default'
+                }`}
+                title={isHost ? 'Host: Click to switch to Screening Mode (Host Broadcast)' : 'Dual Viewing: Both users have movie file'}
+              >
+                <span>Viewing ↔ Viewing</span>
+                {isHost && <span className="text-[8px] bg-rose-500/40 px-1 rounded text-white">Switch</span>}
+              </button>
             )}
           </div>
         </div>
@@ -424,34 +460,60 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
             <div className="absolute -inset-3 bg-gradient-to-r from-rose-600/20 via-purple-600/15 to-pink-600/20 rounded-3xl blur-2xl -z-10 pointer-events-none" />
             <ReactionOverlay reactions={reactions} />
 
-            <VideoPlayer
-              videoRef={videoRef}
-              isHost={isHost}
-              canControl={canControl}
-              roomMode={room?.mode}
-              remoteStream={remoteScreeningStream}
-              onStartScreeningStream={(stream) => setScreeningStream(stream)}
-              onStopScreeningStream={() => setScreeningStream(null)}
-              partnerMetadata={partnerMetadata}
-              onVideoSelected={handleVideoSelected}
-              onPlay={triggerPlay}
-              onPause={triggerPause}
-              onSeek={triggerSeek}
-              onReplay={triggerReplay}
-              videoEventHandlers={eventHandlers}
-              onSendReaction={handleSendReaction}
-              reactionsEnabled={room?.settings.reactionsEnabled ?? true}
-              reactions={reactions}
-              messages={messages}
-              currentParticipantId={myParticipantId}
-              onSendMessage={handleSendMessage}
-              voiceEnabled={room?.settings.voiceChat ?? true}
-              isVoiceMuted={isMuted}
-              onToggleVoiceMute={toggleMute}
-              isSpeakingLocally={isSpeakingLocally}
-              partnerIsSpeaking={partnerIsSpeaking}
-              partnerName={partnerName}
-            />
+            {isScreeningMode ? (
+              <ScreeningPlayer
+                videoRef={videoRef}
+                isHost={isHost}
+                canControl={canControl}
+                remoteStream={remoteScreeningStream}
+                onStartScreeningStream={(stream) => setScreeningStream(stream)}
+                onStopScreeningStream={() => setScreeningStream(null)}
+                partnerMetadata={partnerMetadata}
+                onVideoSelected={handleVideoSelected}
+                onPlay={triggerPlay}
+                onPause={triggerPause}
+                onSeek={triggerSeek}
+                onReplay={triggerReplay}
+                videoEventHandlers={eventHandlers}
+                onSendReaction={handleSendReaction}
+                reactionsEnabled={room?.settings.reactionsEnabled ?? true}
+                reactions={reactions}
+                messages={messages}
+                currentParticipantId={myParticipantId}
+                onSendMessage={handleSendMessage}
+                voiceEnabled={room?.settings.voiceChat ?? true}
+                isVoiceMuted={isMuted}
+                onToggleVoiceMute={toggleMute}
+                isSpeakingLocally={isSpeakingLocally}
+                partnerIsSpeaking={partnerIsSpeaking}
+                partnerName={partnerName}
+              />
+            ) : (
+              <DualViewingPlayer
+                videoRef={videoRef}
+                isHost={isHost}
+                canControl={canControl}
+                partnerMetadata={partnerMetadata}
+                onVideoSelected={handleVideoSelected}
+                onPlay={triggerPlay}
+                onPause={triggerPause}
+                onSeek={triggerSeek}
+                onReplay={triggerReplay}
+                videoEventHandlers={eventHandlers}
+                onSendReaction={handleSendReaction}
+                reactionsEnabled={room?.settings.reactionsEnabled ?? true}
+                reactions={reactions}
+                messages={messages}
+                currentParticipantId={myParticipantId}
+                onSendMessage={handleSendMessage}
+                voiceEnabled={room?.settings.voiceChat ?? true}
+                isVoiceMuted={isMuted}
+                onToggleVoiceMute={toggleMute}
+                isSpeakingLocally={isSpeakingLocally}
+                partnerIsSpeaking={partnerIsSpeaking}
+                partnerName={partnerName}
+              />
+            )}
           </div>
 
           {/* Mobile Bottom Area: Direct Chat fills remaining height cleanly */}

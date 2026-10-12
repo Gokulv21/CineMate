@@ -261,6 +261,15 @@ export class RoomManager {
     return room.settings;
   }
 
+  public updateMode(roomId: string, participantId: string, mode: WatchMode): WatchMode | null {
+    const room = this.getRoom(roomId);
+    if (!room || room.hostId !== participantId) return null;
+
+    room.mode = mode;
+    room.lastActivityAt = Date.now();
+    return room.mode;
+  }
+
   public transferHost(roomId: string, currentHostId: string, newHostId: string): boolean {
     const room = this.getRoom(roomId);
     if (!room || room.hostId !== currentHostId) return false;

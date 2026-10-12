@@ -106,6 +106,10 @@ export type ClientMessage =
       settings: Partial<RoomSettings>;
     }
   | {
+      type: 'UPDATE_MODE';
+      mode: WatchMode;
+    }
+  | {
       type: 'TRANSFER_HOST';
       newHostId: string;
     }
@@ -187,6 +191,10 @@ export type ServerMessage =
   | {
       type: 'SETTINGS_UPDATED';
       settings: RoomSettings;
+    }
+  | {
+      type: 'MODE_UPDATED';
+      mode: WatchMode;
     }
   | {
       type: 'PARTICIPANT_MUTE_UPDATED';

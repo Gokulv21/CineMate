@@ -300,6 +300,28 @@ export class WebSocketHandler implements PeerMessenger {
         break;
       }
 
+      case 'UPDATE_MODE': {
+        if (!session) return;
+        const newMode = this.roomManager.updateMode(session.roomId, session.participantId, msg.mode);
+        if (newMode) {
+          this.broadcastToRoom(session.roomId, {
+            type: 'MODE_UPDATED',
+            mode: newMode
+          });
+          const room = this.roomManager.getRoom(session.roomId);
+          if (room) {
+            this.broadcastToRoom(session.roomId, {
+              type: 'ROOM_STATE',
+              room,
+              yourParticipantId: ''
+            });
+          }
+        } else {
+          this.sendError(ws, 'PERMISSION_DENIED', 'Only host can change watch mode');
+        }
+        break;
+      }
+
       case 'TRANSFER_HOST': {
         if (!session) return;
         const ok = this.roomManager.transferHost(session.roomId, session.participantId, msg.newHostId);
