@@ -12,9 +12,9 @@
   "categories": ["entertainment", "video", "social"],
   "icons": [
     {
-      "src": "/pwa-icon.svg",
+      "src": "/logo.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {

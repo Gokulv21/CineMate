@@ -21,7 +21,8 @@ import {
   ShieldCheck,
   RefreshCw
 } from 'lucide-react';
-import type { VideoMetadata, ChatMessage, FloatingReaction } from '../types/index.js';
+import type { VideoMetadata, ChatMessage, FloatingReaction, ServerMessage } from '../types/index.js';
+import { wsService } from '../services/websocket.js';
 import { formatTime } from '../lib/utils.js';
 import { ReactionOverlay } from './ReactionOverlay.js';
 
@@ -88,6 +89,9 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedFileRef = useRef<string>('');
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaElementSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   // Player state
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -142,12 +146,71 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
     }
   }, [isHost, partnerMetadata]);
 
+  // Viewer receives live position updates without altering live stream currentTime
+  useEffect(() => {
+    if (isHost) return;
+    const unsub = wsService.addMessageListener((msg: ServerMessage) => {
+      if (msg.type === 'SYNC_CORRECTION' || msg.type === 'PLAY' || msg.type === 'PAUSE' || msg.type === 'SEEK') {
+        setCurrentTime(msg.position);
+      }
+    });
+    return () => unsub();
+  }, [isHost]);
+
+  // Broadcast local video element stream (video + audio) to WebRTC
+  const broadcastLocalStream = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !isHost || isScreenSharing) return;
+
+    try {
+      const stream = (video as any).captureStream
+        ? (video as any).captureStream(30)
+        : (video as any).mozCaptureStream
+        ? (video as any).mozCaptureStream(30)
+        : null;
+
+      if (stream) {
+        // If captureStream does not have an audio track, route via Web Audio API if not already routed
+        if (stream.getAudioTracks().length === 0 && !mediaElementSourceRef.current) {
+          try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (AudioCtx) {
+              const ctx = audioContextRef.current || new AudioCtx();
+              audioContextRef.current = ctx;
+              if (ctx.state === 'suspended') {
+                ctx.resume().catch(() => {});
+              }
+              const source = ctx.createMediaElementSource(video);
+              mediaElementSourceRef.current = source;
+              const dest = ctx.createMediaStreamDestination();
+              source.connect(dest);
+              source.connect(ctx.destination);
+              const audioTrack = dest.stream.getAudioTracks()[0];
+              if (audioTrack) {
+                stream.addTrack(audioTrack);
+              }
+            }
+          } catch (e) {
+            console.warn('[SCREENING] Audio fallback notice:', e);
+          }
+        }
+
+        console.log('[SCREENING HOST] Broadcasting local stream tracks:', stream.getTracks().map((t: MediaStreamTrack) => `${t.kind}:${t.readyState}`));
+        if (onStartScreeningStream) {
+          onStartScreeningStream(stream);
+        }
+      }
+    } catch (err) {
+      console.warn('[SCREENING HOST] Stream capture error:', err);
+    }
+  }, [isHost, isScreenSharing, onStartScreeningStream, videoRef]);
+
   // Host selects local video file
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (videoSrc) {
+    if (videoSrc && videoSrc !== 'screen-share-active') {
       URL.revokeObjectURL(videoSrc);
     }
     if (onStopScreeningStream) {
@@ -155,6 +218,7 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
     }
 
     setIsScreenSharing(false);
+    selectedFileRef.current = file.name;
     const objectUrl = URL.createObjectURL(file);
     setVideoSrc(objectUrl);
     setFileName(file.name);
@@ -167,44 +231,11 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
     if (!video) return;
 
     setDuration(video.duration);
+    broadcastLocalStream();
 
-    if (isHost && onStartScreeningStream) {
-      try {
-        const stream = (video as any).captureStream
-          ? (video as any).captureStream(30)
-          : (video as any).mozCaptureStream
-          ? (video as any).mozCaptureStream(30)
-          : null;
-
-        if (stream) {
-          // If no audio track in captured stream, capture via Web Audio
-          if (stream.getAudioTracks().length === 0) {
-            try {
-              const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-              if (AudioCtx) {
-                const audioCtx = new AudioCtx();
-                const source = audioCtx.createMediaElementSource(video);
-                const dest = audioCtx.createMediaStreamDestination();
-                source.connect(dest);
-                source.connect(audioCtx.destination);
-                const audioTrack = dest.stream.getAudioTracks()[0];
-                if (audioTrack) {
-                  stream.addTrack(audioTrack);
-                }
-              }
-            } catch (aErr) {
-              console.warn('[SCREENING] Audio capture fallback notice:', aErr);
-            }
-          }
-          onStartScreeningStream(stream);
-        }
-      } catch (err) {
-        console.warn('[SCREENING] captureStream error:', err);
-      }
-    }
-
+    const currentName = selectedFileRef.current || fileName || 'Movie';
     onVideoSelected({
-      fileName,
+      fileName: currentName,
       duration: video.duration,
       size: 0
     });
@@ -224,12 +255,19 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
         }
         setIsScreenSharing(true);
         setVideoSrc('screen-share-active');
-        setFileName('Live Screen / Window Stream');
+        const shareName = 'Live Screen / Tab Broadcast';
+        setFileName(shareName);
+        selectedFileRef.current = shareName;
+
+        stream.getVideoTracks()[0].onended = () => {
+          handleStopScreening();
+        };
+
         if (onStartScreeningStream) {
           onStartScreeningStream(stream);
         }
         onVideoSelected({
-          fileName: 'Live Screen / Window Stream',
+          fileName: shareName,
           duration: 7200,
           size: 0
         });
@@ -261,8 +299,15 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(() => {});
+    }
+
     if (video.paused) {
       video.play().catch(() => {});
+      if (isHost && !isScreenSharing) {
+        broadcastLocalStream();
+      }
       if (isHost && onPlay) onPlay();
     } else {
       video.pause();
@@ -356,46 +401,51 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
 
       {/* STATE 1: HOST SETUP (No movie selected yet) */}
       {isHost && !videoSrc ? (
-        <div className="flex flex-col items-center justify-center p-6 text-center max-w-md animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex flex-col items-center justify-center p-6 text-center max-w-lg animate-in fade-in zoom-in-95 duration-200">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/25 via-pink-500/15 to-violet-500/25 border border-purple-500/40 flex items-center justify-center mb-4 text-purple-300 shadow-[0_0_30px_rgba(168,85,247,0.4)] animate-pulse">
             <Radio className="w-8 h-8" />
           </div>
 
           <span className="text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 mb-3 shadow-[0_0_12px_rgba(168,85,247,0.3)]">
-            SCREENING BROADCASTER (1-WAY STREAM)
+            SCREENING BROADCAST STUDIO (1-WAY LIVE STREAM)
           </span>
 
           <h3 className="text-xl font-black text-white tracking-tight">
-            Screen a Movie to Your Partner
+            Broadcast a Movie to {partnerName || 'Your Partner'}
           </h3>
           <p className="text-xs text-zinc-300 mt-2 leading-relaxed">
-            Choose a movie file from your device or share your browser tab. CineMate streams it live directly to {partnerName || 'your partner'} so they don't have to download anything!
+            In Screening Mode, you stream the movie live over WebRTC. {partnerName || 'Your partner'} watches your live broadcast in real time — they do not need to download or select any file!
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 hover:brightness-110 shadow-lg shadow-purple-950/60 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Choose Movie File to Stream</span>
-            </button>
-
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
             <button
               type="button"
               onClick={handleStartDisplayMedia}
-              className="px-4 py-2.5 rounded-xl font-semibold text-xs text-purple-200 hover:text-white bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/30 flex items-center gap-2 active:scale-95 transition-all cursor-pointer shadow-sm"
-              title="Share CineMate Tab or Player Window"
+              className="p-4 rounded-2xl border border-purple-500/40 bg-purple-950/40 hover:bg-purple-900/60 flex flex-col items-center gap-2 text-center transition-all cursor-pointer shadow-lg hover:scale-[1.02] active:scale-95 group"
             >
-              <Tv className="w-4 h-4 text-purple-400" />
-              <span>Share Tab / Screen</span>
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-300 group-hover:scale-110 transition-transform">
+                <Tv className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-bold text-white">Share Tab / Screen</span>
+              <span className="text-[10px] text-zinc-400">Stream browser tab or window with native sound (Fastest & 60 FPS)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-4 rounded-2xl border border-pink-500/40 bg-pink-950/30 hover:bg-pink-900/50 flex flex-col items-center gap-2 text-center transition-all cursor-pointer shadow-lg hover:scale-[1.02] active:scale-95 group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-300 group-hover:scale-110 transition-transform">
+                <Upload className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-bold text-white">Choose Movie File</span>
+              <span className="text-[10px] text-zinc-400">Select an MP4/MKV video file from your device to broadcast</span>
             </button>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-white/[0.08] text-[11px] text-zinc-400 flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-purple-400" />
-            <span>Encrypted WebRTC P2P stream • Zero server upload</span>
+          <div className="mt-5 pt-3 border-t border-white/[0.08] text-[11px] text-zinc-400 flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
+            <span>Encrypted WebRTC P2P direct stream • Zero server storage</span>
           </div>
         </div>
       ) : !isHost && !remoteStream ? (
@@ -406,19 +456,19 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
           </div>
 
           <span className="text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 mb-3 shadow-[0_0_12px_rgba(168,85,247,0.2)]">
-            SCREENING ↔ VIEWING
+            LIVE SCREENING RECEIVER
           </span>
 
           <h3 className="text-xl font-bold text-white tracking-tight">
             {partnerMetadata?.fileName 
-              ? `${partnerName || 'Host'} Selected "${partnerMetadata.fileName}"`
-              : `Waiting for ${partnerName || 'Host'} to start screening...`}
+              ? `${partnerName || 'Host'} is preparing "${partnerMetadata.fileName}"`
+              : `Waiting for ${partnerName || 'Host'} to broadcast...`}
           </h3>
 
           <p className="text-xs text-zinc-300 mt-2 leading-relaxed">
             {partnerMetadata?.fileName
-              ? 'Connecting to live stream... Playback will begin as soon as Host plays!'
-              : `${partnerName || 'Host'} is selecting the movie to screen. Sit back and relax — you don't need to download any files!`}
+              ? 'Connecting to live broadcast stream... Video will start automatically when host plays!'
+              : `${partnerName || 'Host'} is selecting the movie to screen. Relax — you do NOT need to download or select any file!`}
           </p>
 
           <div className="mt-5 flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/25 text-[11px] text-purple-300">
@@ -456,10 +506,18 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
             className={`${getFitClass()} cursor-pointer transition-all duration-300`}
             onLoadedMetadata={handleLoadedMetadata}
             onTimeUpdate={() => {
-              if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
+              if (isHost && videoRef.current) {
+                setCurrentTime(videoRef.current.currentTime);
+              }
             }}
             onPlay={() => {
               setIsPlaying(true);
+              if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+                audioContextRef.current.resume().catch(() => {});
+              }
+              if (isHost && !isScreenSharing) {
+                broadcastLocalStream();
+              }
               if (videoEventHandlers?.onPlay) videoEventHandlers.onPlay();
             }}
             onPause={() => {
@@ -476,9 +534,9 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
             showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-purple-500/40 shadow-lg text-white">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
               <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-purple-300">
-                {isHost ? 'SCREENING LIVE' : 'LIVE STREAM'}
+                {isHost ? `BROADCASTING TO ${partnerName ? partnerName.toUpperCase() : 'PARTNER'}` : `LIVE FROM ${partnerName ? partnerName.toUpperCase() : 'HOST'}`}
               </span>
               <span className="text-zinc-500 text-xs">•</span>
               <span className="text-xs font-semibold truncate max-w-[150px] sm:max-w-xs">
@@ -491,7 +549,7 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
                 type="button"
                 onClick={handleStopScreening}
                 className="px-2.5 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-white/10 hover:border-rose-500/40 text-zinc-300 hover:text-rose-300 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                title="Choose another movie or stop streaming"
+                title="Stop current broadcast and switch movie"
               >
                 <RefreshCw className="w-3 h-3 text-purple-400" />
                 <span className="hidden sm:inline">Switch</span>

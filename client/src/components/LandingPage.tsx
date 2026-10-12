@@ -17,6 +17,7 @@ import {
   Sliders
 } from 'lucide-react';
 import { Logo } from './Logo.js';
+import logoImg from '../assets/Designer.png';
 import { LanguageSelector } from './LanguageSelector.js';
 
 interface LandingPageProps {
@@ -183,7 +184,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     <div className="flex flex-col min-h-screen">
 
       {/* Hero Header Section */}
-      <section className="pt-14 pb-10 md:pt-20 md:pb-16 px-4 sm:px-6 max-w-5xl mx-auto text-center relative">
+      <section className="pt-12 pb-10 md:pt-16 md:pb-16 px-4 sm:px-6 max-w-5xl mx-auto text-center relative">
+
+        {/* Floating Brand Badge with Designer Emblem */}
+        <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/10 backdrop-blur-xl mb-5 shadow-[0_0_25px_rgba(244,63,94,0.2)]">
+          <img src={logoImg} alt="CineMate" className="w-5 h-5 rounded-lg object-contain shadow-sm" />
+          <span className="text-xs font-bold text-zinc-200 tracking-wide">
+            CineMate • Private Cinema for Two
+          </span>
+        </div>
 
         {/* Cinematic Headline with Gradient & Glow */}
         <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight text-white leading-[1.05] max-w-4xl mx-auto font-sans">
@@ -509,7 +518,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 href="https://zevox-website.vercel.app/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-bold text--400 hover:text-rose-300 underline underline-offset-4 transition-colors"
+                className="font-bold text-rose-400 hover:text-rose-300 underline underline-offset-4 transition-colors"
               >
                 ZEVOX
               </a>

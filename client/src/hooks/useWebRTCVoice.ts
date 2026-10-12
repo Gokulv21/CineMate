@@ -155,6 +155,36 @@ export function useWebRTCVoice({
     });
   }, []);
 
+  // Viewer helper to safely extract and deliver incoming screening stream
+  const extractAndDeliverRemoteScreeningStream = useCallback((pc: RTCPeerConnection) => {
+    if (!isScreeningModeRef.current || isHostRef.current) return;
+
+    const receivers = pc.getReceivers();
+    const videoReceiver = receivers.find(r => r.track && r.track.kind === 'video');
+
+    if (videoReceiver && videoReceiver.track) {
+      const videoTrack = videoReceiver.track;
+
+      const audioReceivers = receivers.filter(r => r.track && r.track.kind === 'audio');
+      // If multiple audio receivers exist, the second one is movie audio
+      const movieAudioReceiver = audioReceivers.length > 1 ? audioReceivers[1] : null;
+
+      const mediaTracks: MediaStreamTrack[] = [videoTrack];
+      if (movieAudioReceiver && movieAudioReceiver.track) {
+        mediaTracks.push(movieAudioReceiver.track);
+      }
+
+      const stream = new MediaStream(mediaTracks);
+      console.log('[WEBRTC] Delivering remote screening stream to viewer, tracks:', mediaTracks.map(t => `${t.kind}:${t.readyState}`));
+      onRemoteScreeningStreamRef.current?.(stream);
+
+      videoTrack.onunmute = () => {
+        console.log('[WEBRTC] Remote video track unmuted!');
+        onRemoteScreeningStreamRef.current?.(new MediaStream(mediaTracks));
+      };
+    }
+  }, []);
+
   const getOrCreatePeerConnection = useCallback((targetId: string): RTCPeerConnection => {
     let pc = peerConnectionsRef.current.get(targetId);
     if (pc && pc.connectionState !== 'closed') {
@@ -171,9 +201,9 @@ export function useWebRTCVoice({
     // Pre-allocate audio transceiver with sendrecv. This ensures both sides negotiate two-way audio!
     const transceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
 
-    // ONLY allocate video transceiver if screening mode is explicitly active!
+    // Allocate video transceiver if screening mode is explicitly active
     if (isScreeningModeRef.current) {
-      const direction = isHostRef.current ? 'sendrecv' : 'recvonly';
+      const direction = isHostRef.current ? 'sendonly' : 'recvonly';
       const videoTransceiver = pc.addTransceiver('video', { direction });
 
       // If host has screening stream with active video track, attach it
@@ -207,16 +237,14 @@ export function useWebRTCVoice({
       // ONLY handle video / movie streams if we are in SCREENING mode and we are the VIEWER (!isHost)
       if (isScreeningModeRef.current && !isHostRef.current) {
         if (event.track.kind === 'video') {
-          const streamToPlay = (event.streams && event.streams[0]) 
-            ? event.streams[0] 
-            : new MediaStream([event.track]);
-          onRemoteScreeningStreamRef.current?.(streamToPlay);
+          extractAndDeliverRemoteScreeningStream(pc);
           return;
         }
 
-        // If received audio track belongs to movie stream (stream with video)
-        if (event.streams && event.streams[0] && event.streams[0].getVideoTracks().length > 0) {
-          onRemoteScreeningStreamRef.current?.(event.streams[0]);
+        const receivers = pc.getReceivers();
+        const audioReceivers = receivers.filter(r => r.track && r.track.kind === 'audio');
+        if (audioReceivers.length > 1 && event.track === audioReceivers[1].track) {
+          extractAndDeliverRemoteScreeningStream(pc);
           return;
         }
       }
@@ -323,7 +351,7 @@ export function useWebRTCVoice({
     };
 
     return pc;
-  }, [getIceServers]);
+  }, [getIceServers, extractAndDeliverRemoteScreeningStream]);
 
   const callPeer = useCallback(async (targetId: string) => {
     if (!myParticipantId || targetId === myParticipantId) return;
@@ -332,7 +360,7 @@ export function useWebRTCVoice({
       const pc = getOrCreatePeerConnection(targetId);
       isRenegotiatingRef.current.set(targetId, true);
 
-      // Explicitly ensure transceiver direction is sendrecv
+      // Explicitly ensure audio transceiver direction is sendrecv
       const transceivers = pc.getTransceivers();
       const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
       if (audioTransceiver) {
@@ -340,13 +368,28 @@ export function useWebRTCVoice({
       }
 
       if (isScreeningModeRef.current) {
-        const videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
-        if (videoTransceiver) {
-          videoTransceiver.direction = isHostRef.current ? 'sendrecv' : 'recvonly';
-          if (isHostRef.current && screeningStreamRef.current) {
-            const videoTrack = screeningStreamRef.current.getVideoTracks()[0];
-            if (videoTrack) {
-              await videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
+        let videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
+        if (!videoTransceiver) {
+          videoTransceiver = pc.addTransceiver('video', { direction: isHostRef.current ? 'sendonly' : 'recvonly' });
+        } else {
+          videoTransceiver.direction = isHostRef.current ? 'sendonly' : 'recvonly';
+        }
+
+        if (isHostRef.current && screeningStreamRef.current) {
+          const videoTrack = screeningStreamRef.current.getVideoTracks()[0];
+          if (videoTrack) {
+            await videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
+          }
+
+          const movieAudioTrack = screeningStreamRef.current.getAudioTracks()[0];
+          if (movieAudioTrack) {
+            const audioTransceivers = transceivers.filter(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
+            let movieAudioTransceiver = audioTransceivers[1];
+            if (!movieAudioTransceiver) {
+              movieAudioTransceiver = pc.addTransceiver(movieAudioTrack, { direction: 'sendonly', streams: [screeningStreamRef.current] });
+            } else {
+              movieAudioTransceiver.direction = 'sendonly';
+              await movieAudioTransceiver.sender.replaceTrack(movieAudioTrack).catch(() => {});
             }
           }
         }
@@ -486,6 +529,10 @@ export function useWebRTCVoice({
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
           await drainIceCandidates(from, pc);
 
+          if (isScreeningModeRef.current && !isHostRef.current) {
+            extractAndDeliverRemoteScreeningStream(pc);
+          }
+
           // If local audio is ready, attach it before creating answer
           if (localStreamRef.current) {
             const track = localStreamRef.current.getAudioTracks()[0];
@@ -500,9 +547,10 @@ export function useWebRTCVoice({
           if (isScreeningModeRef.current && isHostRef.current && screeningStreamRef.current) {
             const videoTrack = screeningStreamRef.current.getVideoTracks()[0];
             if (videoTrack) {
-              const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
-              if (videoSender) {
-                await videoSender.replaceTrack(videoTrack).catch(() => {});
+              const transceivers = pc.getTransceivers();
+              const videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
+              if (videoTransceiver) {
+                await videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
               }
             }
           }
@@ -513,7 +561,7 @@ export function useWebRTCVoice({
             if (t.receiver.track?.kind === 'audio') {
               t.direction = 'sendrecv';
             } else if (t.receiver.track?.kind === 'video') {
-              t.direction = (isScreeningModeRef.current && isHostRef.current) ? 'sendrecv' : 'recvonly';
+              t.direction = (isScreeningModeRef.current && isHostRef.current) ? 'sendonly' : 'recvonly';
             }
           });
 
@@ -540,6 +588,10 @@ export function useWebRTCVoice({
           if (pc && pc.signalingState !== 'stable') {
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
             await drainIceCandidates(from, pc);
+
+            if (isScreeningModeRef.current && !isHostRef.current) {
+              extractAndDeliverRemoteScreeningStream(pc);
+            }
           }
         } catch (err) {
           console.error(`[WEBRTC] Failed to handle answer from ${from}:`, err);
@@ -593,22 +645,23 @@ export function useWebRTCVoice({
     return () => {
       unsubscribe();
     };
-  }, [enabled, myParticipantId, getOrCreatePeerConnection, callPeer, drainIceCandidates]);
+  }, [enabled, myParticipantId, getOrCreatePeerConnection, callPeer, drainIceCandidates, extractAndDeliverRemoteScreeningStream]);
 
   // Synchronize screening stream (video + movie audio) tracks into all active peer connections
   useEffect(() => {
     if (!isScreeningMode || !isHost) return;
     if (!screeningStream) {
-      peerConnectionsRef.current.forEach((pc) => {
-        const senders = pc.getSenders();
-        const videoSender = senders.find(s => s.track?.kind === 'video');
-        if (videoSender) {
-          videoSender.replaceTrack(null).catch(() => {});
+      peerConnectionsRef.current.forEach((pc, targetId) => {
+        const transceivers = pc.getTransceivers();
+        const videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
+        if (videoTransceiver) {
+          videoTransceiver.sender.replaceTrack(null).catch(() => {});
         }
-        const audioSenders = senders.filter(s => s.track?.kind === 'audio');
-        if (audioSenders.length > 1) {
-          audioSenders[1].replaceTrack(null).catch(() => {});
+        const audioTransceivers = transceivers.filter(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
+        if (audioTransceivers.length > 1) {
+          audioTransceivers[1].sender.replaceTrack(null).catch(() => {});
         }
+        callPeer(targetId);
       });
       return;
     }
@@ -617,37 +670,45 @@ export function useWebRTCVoice({
     const movieAudioTrack = screeningStream.getAudioTracks()[0];
 
     peerConnectionsRef.current.forEach(async (pc, targetId) => {
-      const senders = pc.getSenders();
+      const transceivers = pc.getTransceivers();
+      let videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
 
-      if (videoTrack) {
-        const videoSender = senders.find(s => s.track?.kind === 'video');
-        if (videoSender) {
-          await videoSender.replaceTrack(videoTrack).catch(() => {});
-        } else {
-          try {
-            pc.addTrack(videoTrack, screeningStream);
-          } catch (e) {
-            console.warn('[WEBRTC] addTrack video error:', e);
-          }
+      if (!videoTransceiver) {
+        if (videoTrack) {
+          videoTransceiver = pc.addTransceiver(videoTrack, { direction: 'sendonly', streams: [screeningStream] });
+        }
+      } else {
+        videoTransceiver.direction = 'sendonly';
+        if (videoTrack) {
+          await videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
         }
       }
 
       if (movieAudioTrack) {
-        const audioSenders = senders.filter(s => s.track?.kind === 'audio');
-        if (audioSenders.length > 1) {
-          await audioSenders[1].replaceTrack(movieAudioTrack).catch(() => {});
+        const audioTransceivers = transceivers.filter(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
+        let movieAudioTransceiver = audioTransceivers[1];
+        if (!movieAudioTransceiver) {
+          movieAudioTransceiver = pc.addTransceiver(movieAudioTrack, { direction: 'sendonly', streams: [screeningStream] });
         } else {
-          try {
-            pc.addTrack(movieAudioTrack, screeningStream);
-          } catch (e) {
-            console.warn('[WEBRTC] addTrack movie audio error:', e);
-          }
+          movieAudioTransceiver.direction = 'sendonly';
+          await movieAudioTransceiver.sender.replaceTrack(movieAudioTrack).catch(() => {});
         }
       }
 
-      callPeer(targetId);
+      await callPeer(targetId);
     });
   }, [screeningStream, callPeer, isScreeningMode, isHost]);
+
+  // Mode switch: renegotiate peer connections when entering screening mode
+  useEffect(() => {
+    if (isScreeningMode) {
+      participantIds.forEach((targetId) => {
+        if (targetId !== myParticipantId) {
+          callPeer(targetId);
+        }
+      });
+    }
+  }, [isScreeningMode, participantIds, myParticipantId, callPeer]);
 
   useEffect(() => {
     if (!enabled || !myParticipantId) return;

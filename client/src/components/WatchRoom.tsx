@@ -191,6 +191,8 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
     ? (room.settings.playbackControl === 'EVERYONE' || isHost)
     : false;
 
+  const isScreeningMode = room?.mode === 'SCREENING';
+
   const { 
     triggerPlay, 
     triggerPause, 
@@ -201,14 +203,13 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
     videoRef,
     isHost,
     canControl,
-    autoSyncEnabled: room?.settings.autoSync ?? true,
+    autoSyncEnabled: isScreeningMode ? false : (room?.settings.autoSync ?? true),
     initialPlayback: room?.playback
   });
 
   const [screeningStream, setScreeningStream] = useState<MediaStream | null>(null);
   const [remoteScreeningStream, setRemoteScreeningStream] = useState<MediaStream | null>(null);
 
-  const isScreeningMode = room?.mode === 'SCREENING';
   const participantIds = room?.participants.map(p => p.id) || [];
 
   const {
