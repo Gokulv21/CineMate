@@ -52,9 +52,10 @@ export class RoomManager {
 
     const room: Room = {
       id: roomId,
-      name: customRoomName?.trim().slice(0, 50) || 'Movie Night 💚',
+      name: customRoomName?.trim().slice(0, 50) || 'Movie Night 🍿',
       mode: mode || 'DUAL_VIEWING',
       hostId: hostId,
+      creatorHostToken: hostId,
       creatorName: hostName.trim(),
       createdAt: now,
       lastActivityAt: now,
@@ -89,12 +90,20 @@ export class RoomManager {
     if (!room) return null;
 
     const now = Date.now();
+    const cleanName = userName.trim().slice(0, 30);
+    const isCreatorName = !!room.creatorName && cleanName.toLowerCase() === room.creatorName.trim().toLowerCase();
+    const isCreatorToken = !!room.creatorHostToken && existingParticipantId === room.creatorHostToken;
 
     // Check if participant is already connected/registered in room
     if (existingParticipantId) {
       const existing = room.participants.find(p => p.id === existingParticipantId);
       if (existing) {
-        existing.name = userName.trim().slice(0, 30) || existing.name;
+        existing.name = cleanName || existing.name;
+        if (isCreatorToken || isCreatorName) {
+          existing.isHost = true;
+          room.hostId = existing.id;
+          room.participants.forEach(p => { if (p.id !== existing.id) p.isHost = false; });
+        }
         room.lastActivityAt = now;
         this.emptySince.delete(room.id);
         return { room, participant: existing };
@@ -105,34 +114,27 @@ export class RoomManager {
     let participantId: string;
     let isHost = false;
 
-    const isCreatorName = !!room.creatorName && userName.trim().toLowerCase() === room.creatorName.trim().toLowerCase();
-    const hostAlreadyJoined = room.participants.some(p => p.id === room.hostId || p.isHost);
-
-    if (existingParticipantId && existingParticipantId === room.hostId) {
-      // The creator is joining with their host token
+    if (isCreatorToken || isCreatorName) {
+      // Original creator joining or rejoining: ALWAYS guarantee host status!
+      participantId = existingParticipantId || room.hostId || generateId();
+      room.hostId = participantId;
+      isHost = true;
+      room.participants.forEach(p => { p.isHost = false; });
+    } else if (existingParticipantId && existingParticipantId === room.hostId) {
       participantId = room.hostId;
       isHost = true;
-    } else if (existingParticipantId) {
-      participantId = existingParticipantId;
-      isHost = room.hostId === existingParticipantId;
-    } else if (isCreatorName && !hostAlreadyJoined) {
-      // Creator joining by matching name when host has not joined yet
-      participantId = room.hostId;
-      isHost = true;
-    } else if (room.participants.length === 0 && !room.creatorName) {
-      // Room was created without pre-assigned creator name
+    } else if (room.participants.length === 0) {
       participantId = room.hostId || generateId();
       room.hostId = participantId;
       isHost = true;
     } else {
-      // Normal guest joining room code
-      participantId = generateId();
+      participantId = existingParticipantId || generateId();
       isHost = false;
     }
 
     const participant: Participant = {
       id: participantId,
-      name: userName.trim().slice(0, 30) || (isHost ? 'Host' : 'Guest'),
+      name: cleanName || (isHost ? 'Host' : 'Guest'),
       joinedAt: now,
       isHost,
       isMuted: true

@@ -69,14 +69,6 @@ export function useVideoSync({
       const video = videoRef.current;
       if (!video) return;
 
-      // If video is playing a live WebRTC stream (srcObject), bypass all seeking & rate adjustments!
-      if (video.srcObject) {
-        if (msg.type === 'PLAY') {
-          video.play().catch(() => {});
-        }
-        return;
-      }
-
       switch (msg.type) {
         case 'PLAY': {
           isRemoteUpdateRef.current = true;

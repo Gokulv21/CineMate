@@ -16,15 +16,12 @@ import type {
   ConnectionStatus, 
   ServerMessage,
   VideoMetadata,
-  RoomSettings,
-  WatchMode
+  RoomSettings
 } from '../types/index.js';
 import { wsService } from '../services/websocket.js';
 import { useWebRTCVoice } from '../hooks/useWebRTCVoice.js';
 import { useVideoSync } from '../hooks/useVideoSync.js';
-import { useMovieStream } from '../hooks/useMovieStream.js';
 import { DualViewingPlayer } from './DualViewingPlayer.js';
-import { ScreeningPlayer } from './ScreeningPlayer.js';
 import { ChatPanel } from './ChatPanel.js';
 import { VoiceControls } from './VoiceControls.js';
 import { SettingsModal } from './SettingsModal.js';
@@ -240,26 +237,6 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
   const partner = room?.participants.find(p => p.id !== myParticipantId);
   const partnerName = partner?.name || '';
 
-  const isScreeningMode = room?.mode === 'SCREENING';
-
-  const {
-    remoteStream,
-    startBroadcast,
-    stopBroadcast
-  } = useMovieStream({
-    myParticipantId,
-    partnerId: partner?.id,
-    isHost,
-    enabled: isScreeningMode
-  });
-
-  const handleUpdateMode = useCallback((mode: WatchMode) => {
-    wsService.sendMessage({
-      type: 'UPDATE_MODE',
-      mode
-    });
-  }, []);
-
   const handleVideoSelected = useCallback((metadata: { fileName: string; duration: number; size?: number }) => {
     wsService.sendMessage({
       type: 'VIDEO_METADATA',
@@ -320,15 +297,9 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
             <h2 className="text-xs sm:text-sm font-bold text-white truncate max-w-[120px] xs:max-w-[180px] sm:max-w-xs">
               {room?.name || 'Movie Night'}
             </h2>
-            {isScreeningMode ? (
-              <span className="hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)] shrink-0 items-center gap-1">
-                <span>Screening Live Stream</span>
-              </span>
-            ) : (
-              <span className="hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.3)] shrink-0 items-center gap-1">
-                <span>Dual Cinema Sync</span>
-              </span>
-            )}
+            <span className="hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.3)] shrink-0 items-center gap-1">
+              <span>Synced Cinema</span>
+            </span>
           </div>
         </div>
 
@@ -448,60 +419,30 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
             <div className="absolute -inset-3 bg-gradient-to-r from-rose-600/20 via-purple-600/15 to-pink-600/20 rounded-3xl blur-2xl -z-10 pointer-events-none" />
             <ReactionOverlay reactions={reactions} />
 
-            {isScreeningMode ? (
-              <ScreeningPlayer
-                videoRef={videoRef}
-                isHost={isHost}
-                canControl={canControl}
-                remoteStream={remoteStream}
-                onStartScreeningStream={startBroadcast}
-                onStopScreeningStream={stopBroadcast}
-                partnerMetadata={partnerMetadata}
-                onVideoSelected={handleVideoSelected}
-                onPlay={triggerPlay}
-                onPause={triggerPause}
-                onSeek={triggerSeek}
-                onReplay={triggerReplay}
-                videoEventHandlers={eventHandlers}
-                onSendReaction={handleSendReaction}
-                reactionsEnabled={room?.settings.reactionsEnabled ?? true}
-                reactions={reactions}
-                messages={messages}
-                currentParticipantId={myParticipantId}
-                onSendMessage={handleSendMessage}
-                voiceEnabled={room?.settings.voiceChat ?? true}
-                isVoiceMuted={isMuted}
-                onToggleVoiceMute={toggleMute}
-                isSpeakingLocally={isSpeakingLocally}
-                partnerIsSpeaking={partnerIsSpeaking}
-                partnerName={partnerName}
-              />
-            ) : (
-              <DualViewingPlayer
-                videoRef={videoRef}
-                isHost={isHost}
-                canControl={canControl}
-                partnerMetadata={partnerMetadata}
-                onVideoSelected={handleVideoSelected}
-                onPlay={triggerPlay}
-                onPause={triggerPause}
-                onSeek={triggerSeek}
-                onReplay={triggerReplay}
-                videoEventHandlers={eventHandlers}
-                onSendReaction={handleSendReaction}
-                reactionsEnabled={room?.settings.reactionsEnabled ?? true}
-                reactions={reactions}
-                messages={messages}
-                currentParticipantId={myParticipantId}
-                onSendMessage={handleSendMessage}
-                voiceEnabled={room?.settings.voiceChat ?? true}
-                isVoiceMuted={isMuted}
-                onToggleVoiceMute={toggleMute}
-                isSpeakingLocally={isSpeakingLocally}
-                partnerIsSpeaking={partnerIsSpeaking}
-                partnerName={partnerName}
-              />
-            )}
+            <DualViewingPlayer
+              videoRef={videoRef}
+              isHost={isHost}
+              canControl={canControl}
+              partnerMetadata={partnerMetadata}
+              onVideoSelected={handleVideoSelected}
+              onPlay={triggerPlay}
+              onPause={triggerPause}
+              onSeek={triggerSeek}
+              onReplay={triggerReplay}
+              videoEventHandlers={eventHandlers}
+              onSendReaction={handleSendReaction}
+              reactionsEnabled={room?.settings.reactionsEnabled ?? true}
+              reactions={reactions}
+              messages={messages}
+              currentParticipantId={myParticipantId}
+              onSendMessage={handleSendMessage}
+              voiceEnabled={room?.settings.voiceChat ?? true}
+              isVoiceMuted={isMuted}
+              onToggleVoiceMute={toggleMute}
+              isSpeakingLocally={isSpeakingLocally}
+              partnerIsSpeaking={partnerIsSpeaking}
+              partnerName={partnerName}
+            />
           </div>
 
           {/* Mobile Bottom Area: Direct Chat fills remaining height cleanly */}
@@ -554,10 +495,8 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           isOpen={isSettingsOpen}
           isHost={isHost}
           settings={room.settings}
-          mode={room.mode}
           onClose={() => setIsSettingsOpen(false)}
           onUpdateSettings={handleUpdateSettings}
-          onUpdateMode={handleUpdateMode}
         />
       )}
     </div>

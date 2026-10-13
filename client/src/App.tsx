@@ -52,6 +52,11 @@ export const App: React.FC = () => {
     const newUrl = `${window.location.pathname}?room=${roomId}`;
     window.history.pushState({ path: newUrl }, '', newUrl);
 
+    if (hostParticipantId) {
+      sessionStorage.setItem(`cinemate_host_${roomId}`, hostParticipantId);
+    }
+    sessionStorage.setItem(`cinemate_user_${roomId}`, userName);
+
     setActiveRoom({ roomId, userName, participantId: hostParticipantId });
     setIsCreateOpen(false);
   };
@@ -61,7 +66,10 @@ export const App: React.FC = () => {
     const newUrl = `${window.location.pathname}?room=${roomId}`;
     window.history.pushState({ path: newUrl }, '', newUrl);
 
-    setActiveRoom({ roomId, userName });
+    // If this client previously created this room, restore their host token!
+    const savedHostToken = sessionStorage.getItem(`cinemate_host_${roomId}`) || undefined;
+
+    setActiveRoom({ roomId, userName, participantId: savedHostToken });
     setIsJoinOpen(false);
   };
 
