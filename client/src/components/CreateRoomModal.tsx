@@ -273,24 +273,20 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                   <div className="space-y-2">
                     <div className="flex items-center gap-1.5 text-purple-400 font-bold text-xs">
                       <Radio className="w-4 h-4" />
-                      <span>How "Screening ↔ Viewing" Works (Step-by-Step):</span>
+                      <span>Screen Share Mode (Desktop PC / Laptop):</span>
                     </div>
                     <ul className="space-y-1.5 text-[11px] text-zinc-300">
                       <li className="flex items-start gap-1.5">
                         <span className="text-purple-400 font-bold">•</span>
-                        <span><strong>Step 1:</strong> Only you (Host) need the movie file downloaded on your device.</span>
+                        <span><strong>Desktop PC:</strong> Host shares browser tab or window playing the video over WebRTC.</span>
                       </li>
                       <li className="flex items-start gap-1.5">
                         <span className="text-purple-400 font-bold">•</span>
-                        <span><strong>Step 2:</strong> Host screens/streams the movie in real-time to partner via encrypted P2P WebRTC.</span>
-                      </li>
-                      <li className="flex items-start gap-1.5">
-                        <span className="text-purple-400 font-bold">•</span>
-                        <span><strong>Step 3:</strong> Partner downloads 0 MB — watches live stream directly in CineMate (~1080p HD).</span>
+                        <span><strong>📱 Phone Notice:</strong> Mobile browsers (Android Chrome, iOS Safari) cannot stream 2GB movie files directly. For watching on phones, use <strong>Viewing ↔ Viewing</strong>!</span>
                       </li>
                     </ul>
                     <div className="pt-2 border-t border-purple-500/20 text-[10px] text-purple-300 font-medium">
-                      💡 Best when your partner has no space or hasn't downloaded the movie.
+                      💡 For mobile phones, both select the movie file in "Viewing ↔ Viewing" for 100% 4K quality!
                     </div>
                   </div>
                 )}

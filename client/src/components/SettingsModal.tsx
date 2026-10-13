@@ -1,23 +1,27 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Sliders, Zap, Mic, MessageSquare, Sparkles } from 'lucide-react';
-import type { RoomSettings } from '../types/index.js';
+import type { RoomSettings, WatchMode } from '../types/index.js';
 import { LanguageSelector } from './LanguageSelector.js';
 
 interface SettingsModalProps {
   isOpen: boolean;
   isHost: boolean;
   settings: RoomSettings;
+  mode?: WatchMode;
   onClose: () => void;
   onUpdateSettings: (newSettings: Partial<RoomSettings>) => void;
+  onUpdateMode?: (mode: WatchMode) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   isHost,
   settings,
+  mode = 'DUAL_VIEWING',
   onClose,
-  onUpdateSettings
+  onUpdateSettings,
+  onUpdateMode
 }) => {
   const { t } = useTranslation();
 
@@ -54,6 +58,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="space-y-2.5">
+          {/* Watch Mode Selector */}
+          <div className="p-3 rounded-xl bg-[#141220]/80 border border-white/[0.08]">
+            <label className="block text-xs font-semibold text-zinc-300 mb-2">
+              Theater Mode
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={!isHost}
+                onClick={() => onUpdateMode?.('DUAL_VIEWING')}
+                className={`py-2 px-3 rounded-lg text-xs font-semibold text-center transition-all cursor-pointer ${
+                  mode !== 'SCREENING'
+                    ? 'bg-gradient-to-r from-rose-600 to-rose-500 text-white shadow-md shadow-rose-950/60 font-bold'
+                    : 'bg-white/[0.04] text-zinc-400 hover:text-white border border-white/5'
+                } ${!isHost && 'opacity-60 cursor-not-allowed'}`}
+              >
+                Dual Viewing
+              </button>
+              <button
+                type="button"
+                disabled={!isHost}
+                onClick={() => onUpdateMode?.('SCREENING')}
+                className={`py-2 px-3 rounded-lg text-xs font-semibold text-center transition-all cursor-pointer ${
+                  mode === 'SCREENING'
+                    ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-md shadow-purple-950/60 font-bold'
+                    : 'bg-white/[0.04] text-zinc-400 hover:text-white border border-white/5'
+                } ${!isHost && 'opacity-60 cursor-not-allowed'}`}
+              >
+                Screening (1-Way)
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-400 mt-1.5">
+              {mode === 'SCREENING'
+                ? 'Host streams video to partner; partner needs 0 MB download.'
+                : 'Both partners choose local video file; sub-second playback sync.'}
+            </p>
+          </div>
+
           <div className="p-3 rounded-xl bg-[#141220]/80 border border-white/[0.08]">
             <label className="block text-xs font-semibold text-zinc-300 mb-2">
               {t('settings.playbackControl')}

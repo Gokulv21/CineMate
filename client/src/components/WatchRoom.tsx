@@ -16,11 +16,13 @@ import type {
   ConnectionStatus, 
   ServerMessage,
   VideoMetadata,
-  RoomSettings
+  RoomSettings,
+  WatchMode
 } from '../types/index.js';
 import { wsService } from '../services/websocket.js';
 import { useWebRTCVoice } from '../hooks/useWebRTCVoice.js';
 import { useVideoSync } from '../hooks/useVideoSync.js';
+import { useMovieStream } from '../hooks/useMovieStream.js';
 import { DualViewingPlayer } from './DualViewingPlayer.js';
 import { ScreeningPlayer } from './ScreeningPlayer.js';
 import { ChatPanel } from './ChatPanel.js';
@@ -191,8 +193,6 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
     ? (room.settings.playbackControl === 'EVERYONE' || isHost)
     : false;
 
-  const isScreeningMode = room?.mode === 'SCREENING';
-
   const { 
     triggerPlay, 
     triggerPause, 
@@ -203,12 +203,9 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
     videoRef,
     isHost,
     canControl,
-    autoSyncEnabled: isScreeningMode ? false : (room?.settings.autoSync ?? true),
+    autoSyncEnabled: room?.settings.autoSync ?? true,
     initialPlayback: room?.playback
   });
-
-  const [screeningStream, setScreeningStream] = useState<MediaStream | null>(null);
-  const [remoteScreeningStream, setRemoteScreeningStream] = useState<MediaStream | null>(null);
 
   const participantIds = room?.participants.map(p => p.id) || [];
 
@@ -223,22 +220,8 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
   } = useWebRTCVoice({
     myParticipantId,
     participantIds,
-    enabled: room?.settings.voiceChat ?? true,
-    isScreeningMode,
-    isHost,
-    screeningStream,
-    onRemoteScreeningStream: setRemoteScreeningStream
+    enabled: room?.settings.voiceChat ?? true
   });
-
-  const handleToggleMode = useCallback(() => {
-    if (!isHost || !room) return;
-    const nextMode = room.mode === 'SCREENING' ? 'DUAL_VIEWING' : 'SCREENING';
-    wsService.sendMessage({
-      type: 'UPDATE_MODE',
-      mode: nextMode
-    });
-    setRoom(prev => prev ? { ...prev, mode: nextMode } : null);
-  }, [isHost, room]);
 
   // Smart Audio Ducking: When partner speaks, duck video volume to 35% so their voice is crystal clear
   const previousVolumeRef = useRef<number>(1.0);
@@ -256,6 +239,26 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
 
   const partner = room?.participants.find(p => p.id !== myParticipantId);
   const partnerName = partner?.name || '';
+
+  const isScreeningMode = room?.mode === 'SCREENING';
+
+  const {
+    remoteStream,
+    startBroadcast,
+    stopBroadcast
+  } = useMovieStream({
+    myParticipantId,
+    partnerId: partner?.id,
+    isHost,
+    enabled: isScreeningMode
+  });
+
+  const handleUpdateMode = useCallback((mode: WatchMode) => {
+    wsService.sendMessage({
+      type: 'UPDATE_MODE',
+      mode
+    });
+  }, []);
 
   const handleVideoSelected = useCallback((metadata: { fileName: string; duration: number; size?: number }) => {
     wsService.sendMessage({
@@ -317,30 +320,14 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
             <h2 className="text-xs sm:text-sm font-bold text-white truncate max-w-[120px] xs:max-w-[180px] sm:max-w-xs">
               {room?.name || 'Movie Night'}
             </h2>
-            {room?.mode === 'SCREENING' ? (
-              <button
-                type="button"
-                onClick={isHost ? handleToggleMode : undefined}
-                className={`hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)] shrink-0 items-center gap-1 ${
-                  isHost ? 'hover:bg-purple-500/35 cursor-pointer active:scale-95 transition-all' : 'cursor-default'
-                }`}
-                title={isHost ? 'Host: Click to switch to Dual Viewing (Both have movie file)' : 'Screening Mode: Host streams to Viewer'}
-              >
-                <span>Screening ↔ Viewing</span>
-                {isHost && <span className="text-[8px] bg-purple-500/40 px-1 rounded text-white">Switch</span>}
-              </button>
+            {isScreeningMode ? (
+              <span className="hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)] shrink-0 items-center gap-1">
+                <span>Screening Live Stream</span>
+              </span>
             ) : (
-              <button
-                type="button"
-                onClick={isHost ? handleToggleMode : undefined}
-                className={`hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.3)] shrink-0 items-center gap-1 ${
-                  isHost ? 'hover:bg-rose-500/35 cursor-pointer active:scale-95 transition-all' : 'cursor-default'
-                }`}
-                title={isHost ? 'Host: Click to switch to Screening Mode (Host Broadcast)' : 'Dual Viewing: Both users have movie file'}
-              >
-                <span>Viewing ↔ Viewing</span>
-                {isHost && <span className="text-[8px] bg-rose-500/40 px-1 rounded text-white">Switch</span>}
-              </button>
+              <span className="hidden sm:inline-flex text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.3)] shrink-0 items-center gap-1">
+                <span>Dual Cinema Sync</span>
+              </span>
             )}
           </div>
         </div>
@@ -466,9 +453,9 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
                 videoRef={videoRef}
                 isHost={isHost}
                 canControl={canControl}
-                remoteStream={remoteScreeningStream}
-                onStartScreeningStream={(stream) => setScreeningStream(stream)}
-                onStopScreeningStream={() => setScreeningStream(null)}
+                remoteStream={remoteStream}
+                onStartScreeningStream={startBroadcast}
+                onStopScreeningStream={stopBroadcast}
                 partnerMetadata={partnerMetadata}
                 onVideoSelected={handleVideoSelected}
                 onPlay={triggerPlay}
@@ -567,8 +554,10 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
           isOpen={isSettingsOpen}
           isHost={isHost}
           settings={room.settings}
+          mode={room.mode}
           onClose={() => setIsSettingsOpen(false)}
           onUpdateSettings={handleUpdateSettings}
+          onUpdateMode={handleUpdateMode}
         />
       )}
     </div>

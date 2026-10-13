@@ -447,6 +447,9 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
         }}
         onPlay={() => {
           setIsPlaying(true);
+          if (isHost && !isScreenSharing) {
+            broadcastLocalStream();
+          }
           if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
             audioContextRef.current.resume().catch(() => {});
           }

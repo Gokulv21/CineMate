@@ -6,10 +6,6 @@ interface WebRTCVoiceProps {
   myParticipantId: string;
   participantIds: string[];
   enabled: boolean;
-  isScreeningMode?: boolean;
-  isHost?: boolean;
-  screeningStream?: MediaStream | null;
-  onRemoteScreeningStream?: (stream: MediaStream | null) => void;
 }
 
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
@@ -58,31 +54,17 @@ function enhanceSdpForVoice(sdp: string): string {
 export function useWebRTCVoice({
   myParticipantId,
   participantIds,
-  enabled,
-  isScreeningMode = false,
-  isHost = false,
-  screeningStream,
-  onRemoteScreeningStream
+  enabled
 }: WebRTCVoiceProps) {
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('DISCONNECTED');
   const [isMuted, setIsMuted] = useState<boolean>(true);
   const isMutedRef = useRef<boolean>(true);
   isMutedRef.current = isMuted;
 
-  const isScreeningModeRef = useRef<boolean>(isScreeningMode);
-  isScreeningModeRef.current = isScreeningMode;
-  const isHostRef = useRef<boolean>(isHost);
-  isHostRef.current = isHost;
-
   const [isSpeakingLocally, setIsSpeakingLocally] = useState<boolean>(false);
   const [remoteSpeakingPeers, setRemoteSpeakingPeers] = useState<string[]>([]);
 
   const localStreamRef = useRef<MediaStream | null>(null);
-  const screeningStreamRef = useRef<MediaStream | null>(null);
-  screeningStreamRef.current = screeningStream || null;
-  const onRemoteScreeningStreamRef = useRef<((stream: MediaStream | null) => void) | undefined>(onRemoteScreeningStream);
-  onRemoteScreeningStreamRef.current = onRemoteScreeningStream;
-
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const remoteAudioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -155,36 +137,6 @@ export function useWebRTCVoice({
     });
   }, []);
 
-  // Viewer helper to safely extract and deliver incoming screening stream
-  const extractAndDeliverRemoteScreeningStream = useCallback((pc: RTCPeerConnection) => {
-    if (!isScreeningModeRef.current || isHostRef.current) return;
-
-    const receivers = pc.getReceivers();
-    const videoReceiver = receivers.find(r => r.track && r.track.kind === 'video');
-
-    if (videoReceiver && videoReceiver.track) {
-      const videoTrack = videoReceiver.track;
-
-      const audioReceivers = receivers.filter(r => r.track && r.track.kind === 'audio');
-      // If multiple audio receivers exist, the second one is movie audio
-      const movieAudioReceiver = audioReceivers.length > 1 ? audioReceivers[1] : null;
-
-      const mediaTracks: MediaStreamTrack[] = [videoTrack];
-      if (movieAudioReceiver && movieAudioReceiver.track) {
-        mediaTracks.push(movieAudioReceiver.track);
-      }
-
-      const stream = new MediaStream(mediaTracks);
-      console.log('[WEBRTC] Delivering remote screening stream to viewer, tracks:', mediaTracks.map(t => `${t.kind}:${t.readyState}`));
-      onRemoteScreeningStreamRef.current?.(stream);
-
-      videoTrack.onunmute = () => {
-        console.log('[WEBRTC] Remote video track unmuted!');
-        onRemoteScreeningStreamRef.current?.(new MediaStream(mediaTracks));
-      };
-    }
-  }, []);
-
   const getOrCreatePeerConnection = useCallback((targetId: string): RTCPeerConnection => {
     let pc = peerConnectionsRef.current.get(targetId);
     if (pc && pc.connectionState !== 'closed') {
@@ -200,20 +152,6 @@ export function useWebRTCVoice({
 
     // Pre-allocate audio transceiver with sendrecv. This ensures both sides negotiate two-way audio!
     const transceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
-
-    // Allocate video transceiver if screening mode is explicitly active
-    if (isScreeningModeRef.current) {
-      const direction = isHostRef.current ? 'sendonly' : 'recvonly';
-      const videoTransceiver = pc.addTransceiver('video', { direction });
-
-      // If host has screening stream with active video track, attach it
-      if (isHostRef.current && screeningStreamRef.current) {
-        const videoTrack = screeningStreamRef.current.getVideoTracks()[0];
-        if (videoTrack) {
-          videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
-        }
-      }
-    }
 
     // If local mic track is already active, attach it right now
     if (localStreamRef.current) {
@@ -234,26 +172,6 @@ export function useWebRTCVoice({
     };
 
     pc.ontrack = (event) => {
-      // ONLY handle video / movie streams if we are in SCREENING mode and we are the VIEWER (!isHost)
-      if (isScreeningModeRef.current && !isHostRef.current) {
-        if (event.track.kind === 'video') {
-          extractAndDeliverRemoteScreeningStream(pc);
-          return;
-        }
-
-        const receivers = pc.getReceivers();
-        const audioReceivers = receivers.filter(r => r.track && r.track.kind === 'audio');
-        if (audioReceivers.length > 1 && event.track === audioReceivers[1].track) {
-          extractAndDeliverRemoteScreeningStream(pc);
-          return;
-        }
-      }
-
-      // If in DUAL_VIEWING or host, ignore any stray video tracks completely!
-      if (event.track.kind === 'video') {
-        return;
-      }
-
       let audioContainer = document.getElementById('cinemate-voice-container');
       if (!audioContainer) {
         audioContainer = document.createElement('div');
@@ -351,7 +269,7 @@ export function useWebRTCVoice({
     };
 
     return pc;
-  }, [getIceServers, extractAndDeliverRemoteScreeningStream]);
+  }, [getIceServers]);
 
   const callPeer = useCallback(async (targetId: string) => {
     if (!myParticipantId || targetId === myParticipantId) return;
@@ -360,39 +278,11 @@ export function useWebRTCVoice({
       const pc = getOrCreatePeerConnection(targetId);
       isRenegotiatingRef.current.set(targetId, true);
 
-      // Explicitly ensure audio transceiver direction is sendrecv
+      // Explicitly ensure transceiver direction is sendrecv
       const transceivers = pc.getTransceivers();
       const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
       if (audioTransceiver) {
         audioTransceiver.direction = 'sendrecv';
-      }
-
-      if (isScreeningModeRef.current) {
-        let videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
-        if (!videoTransceiver) {
-          videoTransceiver = pc.addTransceiver('video', { direction: isHostRef.current ? 'sendonly' : 'recvonly' });
-        } else {
-          videoTransceiver.direction = isHostRef.current ? 'sendonly' : 'recvonly';
-        }
-
-        if (isHostRef.current && screeningStreamRef.current) {
-          const videoTrack = screeningStreamRef.current.getVideoTracks()[0];
-          if (videoTrack) {
-            await videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
-          }
-
-          const movieAudioTrack = screeningStreamRef.current.getAudioTracks()[0];
-          if (movieAudioTrack) {
-            const audioTransceivers = transceivers.filter(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
-            let movieAudioTransceiver = audioTransceivers[1];
-            if (!movieAudioTransceiver) {
-              movieAudioTransceiver = pc.addTransceiver(movieAudioTrack, { direction: 'sendonly', streams: [screeningStreamRef.current] });
-            } else {
-              movieAudioTransceiver.direction = 'sendonly';
-              await movieAudioTransceiver.sender.replaceTrack(movieAudioTrack).catch(() => {});
-            }
-          }
-        }
       }
 
       if (localStreamRef.current) {
@@ -404,7 +294,7 @@ export function useWebRTCVoice({
 
       const offer = await pc.createOffer({
         offerToReceiveAudio: true,
-        offerToReceiveVideo: Boolean(isScreeningModeRef.current && !isHostRef.current)
+        offerToReceiveVideo: false
       });
       const enhancedSdp = enhanceSdpForVoice(offer.sdp || '');
       const enhancedOffer = new RTCSessionDescription({ type: offer.type, sdp: enhancedSdp });
@@ -526,24 +416,8 @@ export function useWebRTCVoice({
         const { from, offer } = msg;
         try {
           const pc = getOrCreatePeerConnection(from);
-
-          // Perfect Negotiation: Handle offer collision / glare
-          if (pc.signalingState !== 'stable') {
-            const isPolite = !isHostRef.current; // Viewer is polite, host is impolite
-            if (!isPolite) {
-              console.warn(`[WEBRTC] Host ignoring colliding offer from ${from}`);
-              return;
-            }
-            console.log(`[WEBRTC] Viewer rolling back local offer to accept incoming offer from ${from}`);
-            await pc.setLocalDescription({ type: 'rollback' });
-          }
-
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
           await drainIceCandidates(from, pc);
-
-          if (isScreeningModeRef.current && !isHostRef.current) {
-            extractAndDeliverRemoteScreeningStream(pc);
-          }
 
           // If local audio is ready, attach it before creating answer
           if (localStreamRef.current) {
@@ -556,30 +430,11 @@ export function useWebRTCVoice({
             }
           }
 
-          if (isScreeningModeRef.current && isHostRef.current && screeningStreamRef.current) {
-            const videoTrack = screeningStreamRef.current.getVideoTracks()[0];
-            if (videoTrack) {
-              const transceivers = pc.getTransceivers();
-              const videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
-              if (videoTransceiver) {
-                await videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
-              }
-            }
-          }
-
-          // Ensure transceiver directions
+          // Ensure transceiver direction is sendrecv
           const transceivers = pc.getTransceivers();
-          const audioTransceivers = transceivers.filter(t => t.receiver.track?.kind === 'audio');
-          if (audioTransceivers[0]) {
-            audioTransceivers[0].direction = 'sendrecv'; // mic voice chat
-          }
-          if (audioTransceivers[1]) {
-            audioTransceivers[1].direction = isHostRef.current ? 'sendonly' : 'recvonly'; // movie audio
-          }
-          const videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video');
-          if (videoTransceiver) {
-            videoTransceiver.direction = (isScreeningModeRef.current && isHostRef.current) ? 'sendonly' : 'recvonly';
-          }
+          transceivers.forEach(t => {
+            t.direction = 'sendrecv';
+          });
 
           const answer = await pc.createAnswer();
           const enhancedSdp = enhanceSdpForVoice(answer.sdp || '');
@@ -604,10 +459,6 @@ export function useWebRTCVoice({
           if (pc && pc.signalingState !== 'stable') {
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
             await drainIceCandidates(from, pc);
-
-            if (isScreeningModeRef.current && !isHostRef.current) {
-              extractAndDeliverRemoteScreeningStream(pc);
-            }
           }
         } catch (err) {
           console.error(`[WEBRTC] Failed to handle answer from ${from}:`, err);
@@ -661,70 +512,7 @@ export function useWebRTCVoice({
     return () => {
       unsubscribe();
     };
-  }, [enabled, myParticipantId, getOrCreatePeerConnection, callPeer, drainIceCandidates, extractAndDeliverRemoteScreeningStream]);
-
-  // Synchronize screening stream (video + movie audio) tracks into all active peer connections
-  useEffect(() => {
-    if (!isScreeningMode || !isHost) return;
-    if (!screeningStream) {
-      peerConnectionsRef.current.forEach((pc, targetId) => {
-        const transceivers = pc.getTransceivers();
-        const videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
-        if (videoTransceiver) {
-          videoTransceiver.sender.replaceTrack(null).catch(() => {});
-        }
-        const audioTransceivers = transceivers.filter(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
-        if (audioTransceivers.length > 1) {
-          audioTransceivers[1].sender.replaceTrack(null).catch(() => {});
-        }
-        callPeer(targetId);
-      });
-      return;
-    }
-
-    const videoTrack = screeningStream.getVideoTracks()[0];
-    const movieAudioTrack = screeningStream.getAudioTracks()[0];
-
-    peerConnectionsRef.current.forEach(async (pc, targetId) => {
-      const transceivers = pc.getTransceivers();
-      let videoTransceiver = transceivers.find(t => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
-
-      if (!videoTransceiver) {
-        if (videoTrack) {
-          videoTransceiver = pc.addTransceiver(videoTrack, { direction: 'sendonly', streams: [screeningStream] });
-        }
-      } else {
-        videoTransceiver.direction = 'sendonly';
-        if (videoTrack) {
-          await videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
-        }
-      }
-
-      if (movieAudioTrack) {
-        const audioTransceivers = transceivers.filter(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
-        let movieAudioTransceiver = audioTransceivers[1];
-        if (!movieAudioTransceiver) {
-          movieAudioTransceiver = pc.addTransceiver(movieAudioTrack, { direction: 'sendonly', streams: [screeningStream] });
-        } else {
-          movieAudioTransceiver.direction = 'sendonly';
-          await movieAudioTransceiver.sender.replaceTrack(movieAudioTrack).catch(() => {});
-        }
-      }
-
-      await callPeer(targetId);
-    });
-  }, [screeningStream, callPeer, isScreeningMode, isHost]);
-
-  // Mode switch: renegotiate peer connections when entering screening mode (Host only)
-  useEffect(() => {
-    if (isScreeningMode && isHost) {
-      participantIds.forEach((targetId) => {
-        if (targetId !== myParticipantId) {
-          callPeer(targetId);
-        }
-      });
-    }
-  }, [isScreeningMode, isHost, participantIds, myParticipantId, callPeer]);
+  }, [enabled, myParticipantId, getOrCreatePeerConnection, callPeer, drainIceCandidates]);
 
   useEffect(() => {
     if (!enabled || !myParticipantId) return;

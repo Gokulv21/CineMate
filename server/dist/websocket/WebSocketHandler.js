@@ -332,6 +332,24 @@ export class WebSocketHandler {
                 this.signalingHandler.handleIceCandidate(session.roomId, session.participantId, msg.target, msg.candidate);
                 break;
             }
+            case 'STREAM_OFFER': {
+                if (!session)
+                    return;
+                this.signalingHandler.handleStreamOffer(session.roomId, session.participantId, msg.target, msg.offer);
+                break;
+            }
+            case 'STREAM_ANSWER': {
+                if (!session)
+                    return;
+                this.signalingHandler.handleStreamAnswer(session.roomId, session.participantId, msg.target, msg.answer);
+                break;
+            }
+            case 'STREAM_ICE': {
+                if (!session)
+                    return;
+                this.signalingHandler.handleStreamIceCandidate(session.roomId, session.participantId, msg.target, msg.candidate);
+                break;
+            }
             default:
                 console.warn(`[WEBSOCKET] Unknown message type: ${msg.type}`);
         }

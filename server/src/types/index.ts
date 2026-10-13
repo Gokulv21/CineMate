@@ -131,6 +131,21 @@ export type ClientMessage =
   | {
       type: 'MUTE_STATUS';
       isMuted: boolean;
+    }
+  | {
+      type: 'STREAM_OFFER';
+      target: string;
+      offer: any;
+    }
+  | {
+      type: 'STREAM_ANSWER';
+      target: string;
+      answer: any;
+    }
+  | {
+      type: 'STREAM_ICE';
+      target: string;
+      candidate: any;
     };
 
 export type ServerMessage =
@@ -213,6 +228,21 @@ export type ServerMessage =
     }
   | {
       type: 'ICE_CANDIDATE';
+      from: string;
+      candidate: any;
+    }
+  | {
+      type: 'STREAM_OFFER';
+      from: string;
+      offer: any;
+    }
+  | {
+      type: 'STREAM_ANSWER';
+      from: string;
+      answer: any;
+    }
+  | {
+      type: 'STREAM_ICE';
       from: string;
       candidate: any;
     }

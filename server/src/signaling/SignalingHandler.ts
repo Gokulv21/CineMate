@@ -52,4 +52,46 @@ export class SignalingHandler {
       candidate
     });
   }
+
+  public handleStreamOffer(roomId: string, senderId: string, targetId: string, offer: any): boolean {
+    const room = this.roomManager.getRoom(roomId);
+    if (!room) return false;
+
+    const targetExists = room.participants.some(p => p.id === targetId);
+    if (!targetExists) return false;
+
+    return this.messenger.sendToParticipant(roomId, targetId, {
+      type: 'STREAM_OFFER',
+      from: senderId,
+      offer
+    });
+  }
+
+  public handleStreamAnswer(roomId: string, senderId: string, targetId: string, answer: any): boolean {
+    const room = this.roomManager.getRoom(roomId);
+    if (!room) return false;
+
+    const targetExists = room.participants.some(p => p.id === targetId);
+    if (!targetExists) return false;
+
+    return this.messenger.sendToParticipant(roomId, targetId, {
+      type: 'STREAM_ANSWER',
+      from: senderId,
+      answer
+    });
+  }
+
+  public handleStreamIceCandidate(roomId: string, senderId: string, targetId: string, candidate: any): boolean {
+    const room = this.roomManager.getRoom(roomId);
+    if (!room) return false;
+
+    const targetExists = room.participants.some(p => p.id === targetId);
+    if (!targetExists) return false;
+
+    return this.messenger.sendToParticipant(roomId, targetId, {
+      type: 'STREAM_ICE',
+      from: senderId,
+      candidate
+    });
+  }
 }

@@ -1420,10 +1420,10 @@ export const DualViewingPlayer: React.FC<DualViewingPlayerProps> = ({
       />
 
       {!videoSrc ? (
-        <div className="flex flex-col items-center justify-center p-8 text-center max-w-md animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex flex-col items-center justify-center p-6 sm:p-8 text-center max-w-md animate-in fade-in zoom-in-95 duration-200">
           <div 
             onClick={() => fileInputRef.current?.click()}
-            className="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-500/10 to-violet-500/10 border border-dashed border-rose-500/30 hover:border-rose-400 flex items-center justify-center mb-4 cursor-pointer group/pick transition-all hover:bg-rose-500/15 shadow-[0_0_20px_rgba(244,63,94,0.15)]"
+            className="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-500/10 to-violet-500/10 border border-dashed border-rose-500/30 hover:border-rose-400 flex items-center justify-center mb-3 cursor-pointer group/pick transition-all hover:bg-rose-500/15 shadow-[0_0_20px_rgba(244,63,94,0.15)]"
           >
             <Film className="w-7 h-7 text-rose-300 group-hover/pick:text-white transition-all" />
           </div>
@@ -1433,33 +1433,45 @@ export const DualViewingPlayer: React.FC<DualViewingPlayerProps> = ({
           </h3>
 
           {partnerMetadata?.fileName ? (
-            <div className="mt-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-left max-w-xs shadow-sm">
-              <span className="text-[10px] font-mono font-bold text-rose-400 uppercase tracking-wider block">
-                Partner's Movie Selection
+            <div className="w-full mt-3 p-4 rounded-2xl bg-gradient-to-br from-rose-500/20 via-pink-500/10 to-purple-500/10 border border-rose-500/40 text-center shadow-[0_0_25px_rgba(244,63,94,0.25)]">
+              <span className="text-[10px] font-mono font-bold text-rose-300 uppercase tracking-widest block mb-1">
+                🎬 PARTNER SELECTED A MOVIE
               </span>
-              <p className="text-xs font-bold text-white truncate mt-1">
+              <p className="text-sm font-black text-white truncate px-3 py-1.5 bg-black/50 rounded-xl border border-white/10 shadow-inner">
                 {partnerMetadata.fileName}
               </p>
-              <p className="text-[11px] text-zinc-400 mt-1 leading-snug">
-                Select your local copy of this movie below to start synced playback!
+              <p className="text-xs text-rose-200 mt-2.5 font-medium leading-relaxed">
+                Select your copy of <span className="font-bold text-white">"{partnerMetadata.fileName}"</span> on this phone to start synced playback!
+              </p>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-3.5 w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 shadow-[0_0_20px_rgba(244,63,94,0.6)] flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Select "{partnerMetadata.fileName}" on this phone</span>
+              </button>
+              <p className="text-[10px] text-zinc-400 mt-2">
+                🔒 Zero server upload • Plays directly from your device in 100% full quality!
               </p>
             </div>
           ) : (
-            <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-              {t('video.localNotice')}
-            </p>
+            <>
+              <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+                {t('video.localNotice')}
+              </p>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-6 py-2.5 rounded-xl font-bold text-xs text-white cinema-btn-primary shadow-lg shadow-rose-950/60 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>{t('video.chooseFileButton')}</span>
+                </button>
+              </div>
+            </>
           )}
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-6 py-2.5 rounded-xl font-bold text-xs text-white cinema-btn-primary shadow-lg shadow-rose-950/60 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
-            >
-              <Upload className="w-4 h-4" />
-              <span>{t('video.chooseFileButton')}</span>
-            </button>
-          </div>
         </div>
       ) : (
         <>
@@ -1728,6 +1740,19 @@ export const DualViewingPlayer: React.FC<DualViewingPlayerProps> = ({
               <span className="text-[10px] font-mono text-zinc-300 bg-white/10 px-2 py-0.5 rounded-md border border-white/10 shrink-0">
                 {formatTime(duration)}
               </span>
+
+              {/* Partner sync readiness status badge */}
+              {partnerMetadata?.fileName ? (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-md shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span>Partner Ready ✓</span>
+                </span>
+              ) : (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md shrink-0 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span>Waiting for partner...</span>
+                </span>
+              )}
 
               {/* Partner is speaking badge in top HUD */}
               {partnerIsSpeaking && (
