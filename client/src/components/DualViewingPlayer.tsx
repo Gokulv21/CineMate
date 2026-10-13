@@ -32,6 +32,7 @@ import {
 import type { VideoMetadata, ChatMessage, FloatingReaction } from '../types/index.js';
 import { formatTime } from '../lib/utils.js';
 import { ReactionOverlay } from './ReactionOverlay.js';
+import { routeMediaElementToHeadphones, setupAudioDeviceSync } from '../lib/audioRouting.js';
 
 export type VideoFitMode = 'contain' | 'cover' | 'fill' | '16-9' | '21-9' | '4-3';
 
@@ -347,6 +348,9 @@ export const DualViewingPlayer: React.FC<DualViewingPlayerProps> = ({
       }
     } catch {}
 
+    // Ensure audio routes directly to headphones (especially if connected before room creation)
+    routeMediaElementToHeadphones(video).catch(() => {});
+
     onVideoSelected({
       fileName,
       duration: video.duration,
@@ -577,10 +581,14 @@ export const DualViewingPlayer: React.FC<DualViewingPlayerProps> = ({
   const handleInternalPlay = () => {
     setIsPlaying(true);
     setIsEnded(false);
+    if (videoRef.current) {
+      routeMediaElementToHeadphones(videoRef.current).catch(() => {});
+    }
     if (activeExternalAudioId && externalAudioRef.current) {
       if (videoRef.current) {
         externalAudioRef.current.currentTime = videoRef.current.currentTime;
       }
+      routeMediaElementToHeadphones(externalAudioRef.current).catch(() => {});
       externalAudioRef.current.play().catch(() => {});
     }
     videoEventHandlers.onPlay();
@@ -667,28 +675,28 @@ export const DualViewingPlayer: React.FC<DualViewingPlayerProps> = ({
     resetControlsTimeout();
   };
 
-  // Auto-route audio to newly connected Bluetooth earpods or headphones mid-playback
+  // Synchronize audio routing to active Bluetooth earpods or wired headphones
   useEffect(() => {
-    const handleDeviceChange = async () => {
-      console.log('[VideoPlayer] Audio device change detected: re-routing to active earpods/output device');
+    const handleSyncPlayerAudio = async () => {
+      console.log('[VideoPlayer] Audio device sync detected: routing movie audio to active earpods/headphones');
       try {
-        if (videoRef.current && 'setSinkId' in videoRef.current) {
-          await (videoRef.current as any).setSinkId('');
+        if (videoRef.current) {
+          await routeMediaElementToHeadphones(videoRef.current);
         }
-        if (externalAudioRef.current && 'setSinkId' in externalAudioRef.current) {
-          await (externalAudioRef.current as any).setSinkId('');
+        if (externalAudioRef.current) {
+          await routeMediaElementToHeadphones(externalAudioRef.current);
         }
       } catch (err) {
-        console.warn('[VideoPlayer] Error updating sinkId on device change:', err);
+        console.warn('[VideoPlayer] Error updating audio sink on device change:', err);
       }
     };
 
-    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.addEventListener) {
-      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
-      return () => {
-        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
-      };
-    }
+    // Run on mount to catch headphones connected BEFORE room creation
+    handleSyncPlayerAudio();
+
+    // Listen to devicechange, window focus, and tab visibility changes
+    const cleanup = setupAudioDeviceSync(handleSyncPlayerAudio);
+    return cleanup;
   }, [videoRef]);
 
   // Floating messages for landscape/fullscreen view:
@@ -2470,11 +2478,11 @@ export const DualViewingPlayer: React.FC<DualViewingPlayerProps> = ({
                               type="button"
                               onClick={async () => {
                                 try {
-                                  if (videoRef.current && 'setSinkId' in videoRef.current) {
-                                    await (videoRef.current as any).setSinkId('');
+                                  if (videoRef.current) {
+                                    await routeMediaElementToHeadphones(videoRef.current);
                                   }
-                                  if (externalAudioRef.current && 'setSinkId' in externalAudioRef.current) {
-                                    await (externalAudioRef.current as any).setSinkId('');
+                                  if (externalAudioRef.current) {
+                                    await routeMediaElementToHeadphones(externalAudioRef.current);
                                   }
                                 } catch (err) {
                                   console.warn('Sync audio sink error:', err);

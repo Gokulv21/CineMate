@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { wsService } from '../services/websocket.js';
 import type { ServerMessage, VoiceStatus } from '../types/index.js';
+import { routeMediaElementToHeadphones, setupAudioDeviceSync } from '../lib/audioRouting.js';
 
 interface WebRTCVoiceProps {
   myParticipantId: string;
@@ -100,6 +101,28 @@ export function useWebRTCVoice({
       window.removeEventListener('touchstart', handleGesture);
     };
   }, [unlockAudioContext]);
+
+  // Re-route voice audio to active Bluetooth earpods or headphones on connect, disconnect, or tab focus
+  useEffect(() => {
+    const handleSyncVoiceAudio = async () => {
+      console.log('[WEBRTC] Audio device sync detected: routing remote voice to active earpods/headphones');
+      for (const audioEl of remoteAudioElementsRef.current.values()) {
+        try {
+          await routeMediaElementToHeadphones(audioEl);
+          audioEl.play().catch(() => {});
+        } catch (err) {
+          console.warn('[WEBRTC] Failed to sync audio output on audioEl:', err);
+        }
+      }
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
+      }
+    };
+
+    handleSyncVoiceAudio();
+    const cleanup = setupAudioDeviceSync(handleSyncVoiceAudio);
+    return cleanup;
+  }, []);
 
   // Drain and apply queued early ICE candidates once remote description is set
   const drainIceCandidates = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
@@ -208,11 +231,14 @@ export function useWebRTCVoice({
 
       audioEl.srcObject = streamToPlay;
 
+      // Route hardware audio output directly to connected earpods/headphones
+      routeMediaElementToHeadphones(audioEl);
+
       audioEl.play().catch((e) => {
         console.warn('[WEBRTC] Audio autoplay waiting for gesture:', e);
       });
 
-      // Route stream through Web Audio API destination with volume boost
+      // Route stream through Web Audio API analyser strictly for speaking detection (WITHOUT duplicate speaker output)
       try {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioCtx) {
@@ -224,10 +250,6 @@ export function useWebRTCVoice({
             audioCtx.resume().catch(() => {});
           }
           const remoteSource = audioCtx.createMediaStreamSource(streamToPlay);
-          const remoteGain = audioCtx.createGain();
-          remoteGain.gain.value = 1.25; // 25% boost for voice clarity over movies
-          remoteSource.connect(remoteGain);
-          remoteGain.connect(audioCtx.destination);
 
           // Monitor remote partner voice activity (for partner is speaking indicator)
           const remoteAnalyser = audioCtx.createAnalyser();

@@ -227,10 +227,12 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
     if (!video) return;
 
     if (partnerIsSpeaking) {
-      previousVolumeRef.current = video.volume;
+      if (video.volume > 0.35) {
+        previousVolumeRef.current = video.volume;
+      }
       video.volume = Math.min(video.volume, 0.35);
     } else {
-      video.volume = previousVolumeRef.current;
+      video.volume = previousVolumeRef.current || 1.0;
     }
   }, [partnerIsSpeaking]);
 
