@@ -564,47 +564,60 @@ export function useWebRTCVoice({
 
   useEffect(() => {
     if (enabled && voiceStatus === 'DISCONNECTED') {
-      startAudio(false);
+      setVoiceStatus('CONNECTED');
     }
-  }, [enabled, voiceStatus, startAudio]);
+  }, [enabled, voiceStatus]);
 
   const toggleMute = useCallback(() => {
     unlockAudioContext();
 
-    if (!localStreamRef.current) {
-      // First click: start audio unmuted with user gesture
-      startAudio(true).then(() => {
+    if (isMutedRef.current) {
+      // User is unmuting: start audio with user gesture
+      if (!localStreamRef.current) {
+        startAudio(true).then(() => {
+          setIsMuted(false);
+          isMutedRef.current = false;
+          if (localStreamRef.current) {
+            localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = true));
+            const track = localStreamRef.current.getAudioTracks()[0];
+            if (track) attachTrackToPeerConnections(track);
+          }
+          wsService.sendMessage({ type: 'MUTE_STATUS', isMuted: false });
+        });
+      } else {
+        localStreamRef.current.getAudioTracks().forEach((track) => {
+          track.enabled = true;
+        });
         setIsMuted(false);
         isMutedRef.current = false;
-        if (localStreamRef.current) {
-          localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = true));
-          const track = localStreamRef.current.getAudioTracks()[0];
-          if (track) attachTrackToPeerConnections(track);
-        }
+        const track = localStreamRef.current.getAudioTracks()[0];
+        if (track) attachTrackToPeerConnections(track);
         wsService.sendMessage({ type: 'MUTE_STATUS', isMuted: false });
-      });
-      return;
-    }
-
-    const nextMuted = !isMuted;
-    localStreamRef.current.getAudioTracks().forEach((track) => {
-      track.enabled = !nextMuted;
-    });
-    setIsMuted(nextMuted);
-    isMutedRef.current = nextMuted;
-
-    if (!nextMuted) {
-      const track = localStreamRef.current.getAudioTracks()[0];
-      if (track) {
-        attachTrackToPeerConnections(track);
       }
+    } else {
+      // User is muting: stop hardware microphone so phone OS releases in-call mode
+      // and restores single standard Media Volume (like VLC and MX Player)
+      setIsMuted(true);
+      isMutedRef.current = true;
+      if (localStreamRef.current) {
+        localStreamRef.current.getAudioTracks().forEach((track) => {
+          track.stop();
+        });
+        localStreamRef.current = null;
+        peerConnectionsRef.current.forEach((pc) => {
+          const transceivers = pc.getTransceivers();
+          const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio') || transceivers[0];
+          if (audioTransceiver && audioTransceiver.sender) {
+            audioTransceiver.sender.replaceTrack(null).catch(() => {});
+          }
+        });
+      }
+      wsService.sendMessage({
+        type: 'MUTE_STATUS',
+        isMuted: true
+      });
     }
-
-    wsService.sendMessage({
-      type: 'MUTE_STATUS',
-      isMuted: nextMuted
-    });
-  }, [isMuted, startAudio, attachTrackToPeerConnections, unlockAudioContext]);
+  }, [startAudio, attachTrackToPeerConnections, unlockAudioContext]);
 
   useEffect(() => {
     return () => {

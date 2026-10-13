@@ -4,13 +4,11 @@
  * Handles automatic, seamless routing of HTMLMediaElements (<video> and <audio>)
  * to connected headphones, Bluetooth headsets (AirPods, Galaxy Buds, etc.), and external output devices.
  * 
- * Supports:
- * - Headphones connected BEFORE room creation / movie selection
- * - Headphones (Bluetooth or wired) connected AFTER room creation / mid-playback
- * - Automatic detection on mobile (Android Chrome & iOS Safari) where Bluetooth connects
- *   do NOT fire native 'devicechange' events (via proactive signature polling & gesture hooks)
- * - Headphone disconnect fallback to system default speaker without muting or freezing
- * - Window focus / tab visibility changes (e.g. returning after connecting Bluetooth in phone settings)
+ * VLC & MX Player parity:
+ * - Movies play as standard MEDIA (STREAM_MUSIC) with standard Media Volume controls (NOT phone call volume).
+ * - Avoids forcing elements into Android's "communications" / earpiece telephony route.
+ * - System default sink ("") is preserved for native OS Bluetooth A2DP automatic switching.
+ * - Detects in-between Bluetooth/AirPods connections via proactive hardware polling & interaction hooks.
  */
 
 export const HEADPHONE_KEYWORDS = [
@@ -52,7 +50,8 @@ export function isHeadphoneLabel(label: string): boolean {
 
 /**
  * Searches for the best audio output device ID matching headphones/Bluetooth,
- * falling back to the default output device ("").
+ * strictly ignoring internal phone call sinks ("communications", "earpiece").
+ * Falling back to the default output device ("").
  */
 export async function findBestAudioOutputDeviceId(): Promise<string> {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
@@ -64,40 +63,33 @@ export async function findBestAudioOutputDeviceId(): Promise<string> {
     const outputs = devices.filter(d => d.kind === 'audiooutput');
     if (!outputs.length) return '';
 
-    // 1. Look for device explicitly named with headphone or bluetooth keywords
+    // Search for an explicit output device matching headphone keywords
+    // CRITICAL: Blacklist "communications", "earpiece", "telephony", and "speaker"
     const headphoneDevice = outputs.find(d => {
+      const devId = (d.deviceId || '').toLowerCase();
+      if (devId === 'communications' || devId === 'default' || devId === '') return false;
+
       const label = (d.label || '').toLowerCase().trim();
-      return label.length > 0 && isHeadphoneLabel(label);
+      if (!label) return false;
+      if (
+        label.includes('communications') ||
+        label.includes('earpiece') ||
+        label.includes('speaker') ||
+        label.includes('telephony')
+      ) {
+        return false;
+      }
+      return isHeadphoneLabel(label);
     });
 
     if (headphoneDevice && headphoneDevice.deviceId) {
+      console.log('[AudioRouting] Found explicit headphone output device:', headphoneDevice.label, headphoneDevice.deviceId);
       return headphoneDevice.deviceId;
     }
 
-    // 2. Check if an audioinput device matches Bluetooth/AirPods.
-    // On many mobile browsers (especially Android Chrome), the Bluetooth headset is exposed
-    // with its model name under audioinput while audiooutput only lists "default" or "communications".
-    const hasHeadphoneInput = devices.some(d => {
-      if (d.kind !== 'audioinput') return false;
-      const label = (d.label || '').toLowerCase().trim();
-      return label.length > 0 && isHeadphoneLabel(label);
-    });
-
-    if (hasHeadphoneInput) {
-      // If there is an output device whose label is NOT internal speaker, prefer it
-      const preferredOutput = outputs.find(d => {
-        const label = (d.label || '').toLowerCase();
-        return label && !label.includes('speaker') && !label.includes('internal') && !label.includes('built-in');
-      });
-      if (preferredOutput && preferredOutput.deviceId) {
-        return preferredOutput.deviceId;
-      }
-    }
-
-    // 3. Fall back to system default sink ("").
-    // Operating systems (Android, iOS, Windows, macOS) automatically route system default 
-    // to active wired/Bluetooth headphones. Never pick a random non-default ID,
-    // which on mobile points to the internal phone earpiece!
+    // On mobile (Android/iOS), Bluetooth headphones (AirPods) are automatically handled
+    // by the system default sink ("") as standard media (STREAM_MUSIC).
+    // NEVER return "communications" or any non-default device that routes to phone call earpiece!
     return '';
   } catch (err) {
     console.warn('[AudioRouting] Failed to query audio devices:', err);
@@ -111,44 +103,31 @@ export async function findBestAudioOutputDeviceId(): Promise<string> {
 export async function routeMediaElementToHeadphones(element: HTMLMediaElement | null): Promise<void> {
   if (!element) return;
 
-  // On browsers supporting setSinkId (Chrome, Edge, Opera, newer Android Chrome)
+  // On browsers supporting setSinkId (Chrome, Edge, Opera, Android Chrome)
   if (typeof (element as any).setSinkId === 'function') {
     try {
       const bestSinkId = await findBestAudioOutputDeviceId();
       const currentSinkId = (element as any).sinkId ?? '';
 
-      if (bestSinkId && bestSinkId !== '') {
+      if (bestSinkId && bestSinkId !== '' && bestSinkId !== 'communications') {
         if (currentSinkId !== bestSinkId) {
-          console.log(`[AudioRouting] Switching sinkId from "${currentSinkId}" to: "${bestSinkId}"`);
+          console.log(`[AudioRouting] Switching sinkId from "${currentSinkId}" to explicit headphone: "${bestSinkId}"`);
           await (element as any).setSinkId(bestSinkId);
         }
         return;
       }
 
-      // If bestSinkId is '' (system default):
-      // On Chromium, if currentSinkId is ALREADY '', calling setSinkId('') is treated as a no-op,
-      // which fails to re-latch to a newly connected Bluetooth headset on Android.
-      // We force Chromium to re-initialize its AudioTrack by toggling sinkId if multiple outputs exist.
-      const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
-      const outputs = devices.filter(d => d.kind === 'audiooutput');
-
+      // If no explicit headphone device ID is reported (standard on Android Chrome & iOS Safari),
+      // the system default sink ("") MUST be preserved.
+      // System default ("") is what VLC, MX Player, and YouTube use to automatically route
+      // audio to AirPods/Bluetooth and keep the volume on Media Volume (STREAM_MUSIC).
+      // If sinkId was accidentally set to "communications" or anything non-empty, reset to ""!
       if (currentSinkId !== '') {
-        await (element as any).setSinkId('');
-      } else if (outputs.length > 1) {
-        const altSink = outputs.find(o => o.deviceId && o.deviceId !== '')?.deviceId;
-        if (altSink) {
-          try {
-            await (element as any).setSinkId(altSink);
-            await (element as any).setSinkId('');
-          } catch (_) {
-            await (element as any).setSinkId('');
-          }
-        }
-      } else {
+        console.log(`[AudioRouting] Resetting sinkId from "${currentSinkId}" to default media sink ("")`);
         await (element as any).setSinkId('');
       }
     } catch (err) {
-      console.warn('[AudioRouting] Error routing media element sink:', err);
+      console.warn('[AudioRouting] Error routing media sink:', err);
     }
   }
 
@@ -213,12 +192,11 @@ export function setupAudioDeviceSync(callback: () => void | Promise<void>): () =
     navigator.mediaDevices.addEventListener('devicechange', trigger);
   }
 
-  // 2. Proactive device polling every 1200ms
-  // Essential for mobile Android Chrome and iOS Safari where Bluetooth connects/disconnects
-  // do NOT dispatch the 'devicechange' event!
+  // 2. Proactive device polling every 1500ms
+  // Catches mobile Android Chrome & iOS Safari Bluetooth connect/disconnect
   const pollInterval = setInterval(() => {
     checkDeviceSignature();
-  }, 1200);
+  }, 1500);
 
   // 3. Tab focus & page visibility
   const handleFocus = () => {
@@ -236,7 +214,7 @@ export function setupAudioDeviceSync(callback: () => void | Promise<void>): () =
   };
   document.addEventListener('visibilitychange', handleVisibility);
 
-  // 4. Touch & Pointer interaction listeners (in case user opened AirPods case while looking at player)
+  // 4. Touch & Pointer interaction listeners
   let lastTapTime = 0;
   const handleTap = () => {
     const now = Date.now();
