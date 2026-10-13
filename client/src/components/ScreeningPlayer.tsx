@@ -25,6 +25,7 @@ import type { VideoMetadata, ChatMessage, FloatingReaction, ServerMessage } from
 import { wsService } from '../services/websocket.js';
 import { formatTime } from '../lib/utils.js';
 import { ReactionOverlay } from './ReactionOverlay.js';
+import { routeMediaElementToHeadphones, setupAudioDeviceSync } from '../lib/audioRouting.js';
 
 export interface ScreeningPlayerProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -365,6 +366,23 @@ export const ScreeningPlayer: React.FC<ScreeningPlayerProps> = ({
       videoRef.current.muted = newVol === 0;
     }
   };
+
+  // Synchronize audio routing to active Bluetooth earpods or wired headphones
+  useEffect(() => {
+    const handleSyncScreeningAudio = async () => {
+      try {
+        if (videoRef.current) {
+          await routeMediaElementToHeadphones(videoRef.current);
+        }
+      } catch (err) {
+        console.warn('[ScreeningPlayer] Error updating audio sink on device change:', err);
+      }
+    };
+
+    handleSyncScreeningAudio();
+    const cleanup = setupAudioDeviceSync(handleSyncScreeningAudio);
+    return cleanup;
+  }, [videoRef]);
 
   // Fullscreen
   const toggleFullscreen = async () => {

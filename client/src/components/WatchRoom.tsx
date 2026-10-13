@@ -5,8 +5,6 @@ import {
   Settings as SettingsIcon, 
   Share2, 
   LogOut, 
-  Mic,
-  MicOff,
   Volume2
 } from 'lucide-react';
 import type { 
@@ -316,33 +314,6 @@ export const WatchRoom: React.FC<WatchRoomProps> = ({
                   {partnerName || 'Partner'}
                 </span>
               </div>
-              <div className="w-px h-3.5 bg-white/10 mx-0.5" />
-            </>
-          )}
-
-          {/* Quick Voice Mute / Unmute */}
-          {room?.settings.voiceChat && (
-            <>
-              <button
-                type="button"
-                onClick={toggleMute}
-                className={`p-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  isMuted
-                    ? 'text-zinc-400 hover:text-white hover:bg-white/[0.08]'
-                    : 'text-rose-400 hover:text-rose-300 bg-rose-500/10'
-                }`}
-                title={isMuted ? t('voice.unmute') : t('voice.mute')}
-                aria-label={isMuted ? t('voice.unmute') : t('voice.mute')}
-              >
-                {isMuted ? (
-                  <MicOff className="w-3.5 h-3.5 text-zinc-400" />
-                ) : (
-                  <Mic className="w-3.5 h-3.5 text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
-                )}
-                <span className="text-[11px] hidden sm:inline">
-                  {isMuted ? t('voice.mute') : isSpeakingLocally ? t('voice.speaking') : t('voice.title')}
-                </span>
-              </button>
               <div className="w-px h-3.5 bg-white/10 mx-0.5" />
             </>
           )}

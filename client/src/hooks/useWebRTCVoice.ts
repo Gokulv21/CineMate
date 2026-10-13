@@ -106,10 +106,19 @@ export function useWebRTCVoice({
   useEffect(() => {
     const handleSyncVoiceAudio = async () => {
       console.log('[WEBRTC] Audio device sync detected: routing remote voice to active earpods/headphones');
-      for (const audioEl of remoteAudioElementsRef.current.values()) {
+      for (const [peerId, audioEl] of remoteAudioElementsRef.current.entries()) {
         try {
           await routeMediaElementToHeadphones(audioEl);
-          audioEl.play().catch(() => {});
+          if (audioEl.srcObject) {
+            const currentStream = audioEl.srcObject;
+            audioEl.srcObject = null;
+            audioEl.srcObject = currentStream;
+            audioEl.play().catch((e) => {
+              console.warn(`[WEBRTC] play after device sync failed for ${peerId}:`, e);
+            });
+          } else {
+            audioEl.play().catch(() => {});
+          }
         } catch (err) {
           console.warn('[WEBRTC] Failed to sync audio output on audioEl:', err);
         }
