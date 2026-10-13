@@ -28,6 +28,8 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
     }
   }, [initialRoomCode]);
 
+  const [loadingMessage, setLoadingMessage] = useState('Connecting to theater...');
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,12 +41,26 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
 
     setIsLoading(true);
     setError(null);
+    setLoadingMessage('Connecting to theater...');
+
+    const coldStartTimer = setTimeout(() => {
+      setLoadingMessage('Waking up server... (cold start)');
+    }, 3500);
+
+    const controller = new AbortController();
+    const timeoutTimer = setTimeout(() => controller.abort(), 20000);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/rooms/${cleanCode}`);
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${cleanCode}`, {
+        signal: controller.signal
+      });
+
+      clearTimeout(coldStartTimer);
+      clearTimeout(timeoutTimer);
+
       if (!response.ok) {
         if (response.status === 404) {
-          setError(t('joinModal.notFound'));
+          setError(t('joinModal.notFound', 'Room not found or expired.'));
           setIsLoading(false);
           return;
         }
@@ -54,8 +70,17 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
       onJoinRoom(cleanCode, cleanName);
       onClose();
     } catch (err: any) {
+      clearTimeout(coldStartTimer);
+      clearTimeout(timeoutTimer);
       console.error('Join room error:', err);
-      setError(t('joinModal.notFound'));
+
+      if (err.name === 'AbortError') {
+        setError('Connection timed out. If running locally, please start the backend server with "npm run dev". If on Render, the backend may still be booting.');
+      } else if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+        setError('Cannot reach CineMate backend server. Please verify the backend is running on port 4000.');
+      } else {
+        setError(t('joinModal.notFound', 'Room not found or expired.'));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -143,8 +168,8 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Connecting to theater...</span>
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                  <span>{loadingMessage}</span>
                 </>
               ) : (
                 <>

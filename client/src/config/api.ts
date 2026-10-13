@@ -1,18 +1,30 @@
 /**
  * Centralized API & WebSocket Configuration
- * Automatically chooses local proxy in development, or Render backend in production.
+ * Automatically chooses local proxy in development/LAN, or Render backend in production.
  */
+
+const isLocalHostname = (hostname: string): boolean => {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.startsWith('172.') ||
+    hostname.endsWith('.local')
+  );
+};
+
+const isLocal = typeof window !== 'undefined' && isLocalHostname(window.location.hostname);
+const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
 export const API_BASE_URL: string =
   import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? ''
-    : 'https://cinemate-imf3.onrender.com');
+  (isLocal ? '' : 'https://cinemate-imf3.onrender.com');
 
 export const WS_BASE_URL: string =
   import.meta.env.VITE_WS_URL ||
-  (typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? `ws://${window.location.host}/ws`
+  (isLocal
+    ? `${wsProtocol}//${window.location.host}/ws`
     : 'wss://cinemate-imf3.onrender.com/ws');
+

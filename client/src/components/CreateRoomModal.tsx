@@ -29,6 +29,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
   const [userName, setUserName] = useState('');
   const [roomName, setRoomName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Creating room...');
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
   const [createdHostParticipantId, setCreatedHostParticipantId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -43,6 +44,15 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
 
     setIsLoading(true);
     setError(null);
+    setLoadingMessage('Creating room...');
+
+    // If waiting for more than 3.5s, inform the user about server cold start
+    const coldStartTimer = setTimeout(() => {
+      setLoadingMessage('Waking up server... (cold start)');
+    }, 3500);
+
+    const controller = new AbortController();
+    const timeoutTimer = setTimeout(() => controller.abort(), 25000);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/rooms`, {
@@ -53,11 +63,22 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
           roomName: roomName.trim() || undefined,
           mode: 'DUAL_VIEWING',
           playbackControl
-        })
+        }),
+        signal: controller.signal
       });
 
+      clearTimeout(coldStartTimer);
+      clearTimeout(timeoutTimer);
+
       if (!response.ok) {
-        throw new Error('Failed to create room');
+        let errMsg = 'Failed to create room';
+        try {
+          const errData = await response.json();
+          if (errData.error) errMsg = errData.error;
+        } catch {
+          // ignore
+        }
+        throw new Error(errMsg);
       }
 
       const data = await response.json();
@@ -69,8 +90,17 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
         sessionStorage.setItem(`cinemate_user_${data.roomId}`, userName.trim());
       }
     } catch (err: any) {
+      clearTimeout(coldStartTimer);
+      clearTimeout(timeoutTimer);
       console.error('Room creation error:', err);
-      setError(err.message || 'Something went wrong');
+
+      if (err.name === 'AbortError') {
+        setError('Server connection timed out (25s). If running locally, please start the backend server with "npm run dev". If on Render, the free-tier backend may still be waking up.');
+      } else if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+        setError('Cannot connect to CineMate backend server. Please make sure the backend is running on port 4000 or check your connection.');
+      } else {
+        setError(err.message || 'Something went wrong');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -232,8 +262,8 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Creating room...</span>
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      <span>{loadingMessage}</span>
                     </>
                   ) : (
                     <>
