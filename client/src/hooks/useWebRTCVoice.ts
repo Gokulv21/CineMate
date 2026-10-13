@@ -142,25 +142,27 @@ export function useWebRTCVoice({
   // Synchronize local audio track into all existing peer connections
   const attachTrackToPeerConnections = useCallback((track: MediaStreamTrack) => {
     peerConnectionsRef.current.forEach((pc) => {
-      const senders = pc.getSenders();
-      const audioSender = senders.find(s => !s.track || s.track.kind === 'audio');
-      if (audioSender) {
-        audioSender.replaceTrack(track).catch((err) => {
+      const transceivers = pc.getTransceivers();
+      const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio') || transceivers[0];
+
+      if (audioTransceiver) {
+        audioTransceiver.direction = 'sendrecv';
+        audioTransceiver.sender.replaceTrack(track).catch((err) => {
           console.warn('[WEBRTC] replaceTrack failed:', err);
         });
       } else {
-        try {
-          if (localStreamRef.current) {
-            pc.addTrack(track, localStreamRef.current);
-          }
-        } catch (err) {
-          console.warn('[WEBRTC] addTrack failed:', err);
+        const senders = pc.getSenders();
+        const audioSender = senders.find(s => !s.track || s.track.kind === 'audio');
+        if (audioSender) {
+          audioSender.replaceTrack(track).catch((err) => {
+            console.warn('[WEBRTC] replaceTrack failed:', err);
+          });
         }
       }
     });
   }, []);
 
-  const getOrCreatePeerConnection = useCallback((targetId: string): RTCPeerConnection => {
+  const createPeerConnection = useCallback((targetId: string, isInitiator: boolean): RTCPeerConnection => {
     let pc = peerConnectionsRef.current.get(targetId);
     if (pc && pc.connectionState !== 'closed') {
       return pc;
@@ -173,14 +175,14 @@ export function useWebRTCVoice({
 
     peerConnectionsRef.current.set(targetId, pc);
 
-    // Pre-allocate audio transceiver with sendrecv. This ensures both sides negotiate two-way audio!
-    const transceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
-
-    // If local mic track is already active, attach it right now
-    if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        transceiver.sender.replaceTrack(audioTrack).catch(() => {});
+    // If caller, pre-allocate the audio transceiver with sendrecv and attach local mic track
+    if (isInitiator) {
+      const transceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
+      if (localStreamRef.current) {
+        const audioTrack = localStreamRef.current.getAudioTracks()[0];
+        if (audioTrack) {
+          transceiver.sender.replaceTrack(audioTrack).catch(() => {});
+        }
       }
     }
 
@@ -195,6 +197,7 @@ export function useWebRTCVoice({
     };
 
     pc.ontrack = (event) => {
+      console.log(`[WEBRTC] Received remote audio track from ${targetId}`);
       let audioContainer = document.getElementById('cinemate-voice-container');
       if (!audioContainer) {
         audioContainer = document.createElement('div');
@@ -232,11 +235,14 @@ export function useWebRTCVoice({
       audioEl.srcObject = streamToPlay;
 
       // Route hardware audio output directly to connected earpods/headphones
-      routeMediaElementToHeadphones(audioEl);
+      routeMediaElementToHeadphones(audioEl).catch(() => {});
 
-      audioEl.play().catch((e) => {
-        console.warn('[WEBRTC] Audio autoplay waiting for gesture:', e);
-      });
+      const playPromise = audioEl.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((e) => {
+          console.warn('[WEBRTC] Audio autoplay waiting for gesture, will unlock on interaction:', e);
+        });
+      }
 
       // Route stream through Web Audio API analyser strictly for speaking detection (WITHOUT duplicate speaker output)
       try {
@@ -283,6 +289,7 @@ export function useWebRTCVoice({
     };
 
     pc.onconnectionstatechange = () => {
+      console.log(`[WEBRTC] Connection state with ${targetId}:`, pc!.connectionState);
       if (pc!.connectionState === 'failed' || pc!.connectionState === 'disconnected') {
         if (typeof pc!.restartIce === 'function') {
           pc!.restartIce();
@@ -297,20 +304,19 @@ export function useWebRTCVoice({
     if (!myParticipantId || targetId === myParticipantId) return;
 
     try {
-      const pc = getOrCreatePeerConnection(targetId);
+      const pc = createPeerConnection(targetId, true);
       isRenegotiatingRef.current.set(targetId, true);
 
       // Explicitly ensure transceiver direction is sendrecv
       const transceivers = pc.getTransceivers();
-      const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio');
+      const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio' || t.sender.track?.kind === 'audio') || transceivers[0];
       if (audioTransceiver) {
         audioTransceiver.direction = 'sendrecv';
-      }
-
-      if (localStreamRef.current) {
-        const audioTrack = localStreamRef.current.getAudioTracks()[0];
-        if (audioTrack && audioTransceiver) {
-          await audioTransceiver.sender.replaceTrack(audioTrack).catch(() => {});
+        if (localStreamRef.current) {
+          const audioTrack = localStreamRef.current.getAudioTracks()[0];
+          if (audioTrack) {
+            await audioTransceiver.sender.replaceTrack(audioTrack).catch(() => {});
+          }
         }
       }
 
@@ -335,7 +341,7 @@ export function useWebRTCVoice({
     } finally {
       isRenegotiatingRef.current.set(targetId, false);
     }
-  }, [myParticipantId, getOrCreatePeerConnection]);
+  }, [myParticipantId, createPeerConnection]);
 
   const startAudio = useCallback(async (autoUnmute = false) => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -379,9 +385,9 @@ export function useWebRTCVoice({
       const audioTrack = stream.getAudioTracks()[0];
       if (audioTrack) {
         attachTrackToPeerConnections(audioTrack);
-        // Renegotiate with existing peers so both directions are active!
+        // Only initiate calls to peers if not already connected and we are the caller
         participantIds.forEach((targetId) => {
-          if (targetId !== myParticipantId) {
+          if (targetId !== myParticipantId && !peerConnectionsRef.current.has(targetId) && myParticipantId > targetId) {
             callPeer(targetId);
           }
         });
@@ -437,26 +443,25 @@ export function useWebRTCVoice({
       if (msg.type === 'WEBRTC_OFFER') {
         const { from, offer } = msg;
         try {
-          const pc = getOrCreatePeerConnection(from);
+          // Callee creates peer connection without premature transceiver allocation
+          const pc = createPeerConnection(from, false);
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
           await drainIceCandidates(from, pc);
 
-          // If local audio is ready, attach it before creating answer
-          if (localStreamRef.current) {
-            const track = localStreamRef.current.getAudioTracks()[0];
-            if (track) {
-              const sender = pc.getSenders().find(s => !s.track || s.track.kind === 'audio');
-              if (sender) {
-                await sender.replaceTrack(track).catch(() => {});
+          // Find the audio transceiver created by setRemoteDescription
+          const transceivers = pc.getTransceivers();
+          const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio') || transceivers[0];
+
+          if (audioTransceiver) {
+            audioTransceiver.direction = 'sendrecv';
+            // Attach callee's local audio track directly to the answer
+            if (localStreamRef.current) {
+              const track = localStreamRef.current.getAudioTracks()[0];
+              if (track) {
+                await audioTransceiver.sender.replaceTrack(track).catch(() => {});
               }
             }
           }
-
-          // Ensure transceiver direction is sendrecv
-          const transceivers = pc.getTransceivers();
-          transceivers.forEach(t => {
-            t.direction = 'sendrecv';
-          });
 
           const answer = await pc.createAnswer();
           const enhancedSdp = enhanceSdpForVoice(answer.sdp || '');
@@ -534,7 +539,7 @@ export function useWebRTCVoice({
     return () => {
       unsubscribe();
     };
-  }, [enabled, myParticipantId, getOrCreatePeerConnection, callPeer, drainIceCandidates]);
+  }, [enabled, myParticipantId, createPeerConnection, callPeer, drainIceCandidates]);
 
   useEffect(() => {
     if (!enabled || !myParticipantId) return;
@@ -583,12 +588,6 @@ export function useWebRTCVoice({
       const track = localStreamRef.current.getAudioTracks()[0];
       if (track) {
         attachTrackToPeerConnections(track);
-        // Renegotiate with peers to ensure two-way audio flow
-        participantIds.forEach((targetId) => {
-          if (targetId !== myParticipantId) {
-            callPeer(targetId);
-          }
-        });
       }
     }
 
@@ -596,7 +595,7 @@ export function useWebRTCVoice({
       type: 'MUTE_STATUS',
       isMuted: nextMuted
     });
-  }, [isMuted, startAudio, attachTrackToPeerConnections, unlockAudioContext, participantIds, myParticipantId, callPeer]);
+  }, [isMuted, startAudio, attachTrackToPeerConnections, unlockAudioContext]);
 
   useEffect(() => {
     return () => {

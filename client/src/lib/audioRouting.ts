@@ -40,26 +40,18 @@ export async function findBestAudioOutputDeviceId(): Promise<string> {
 
     // 1. Look for device explicitly named with headphone or bluetooth keywords
     const headphoneDevice = outputs.find(d => {
-      const label = (d.label || '').toLowerCase();
-      return HEADPHONE_KEYWORDS.some(keyword => label.includes(keyword));
+      const label = (d.label || '').toLowerCase().trim();
+      return label.length > 0 && HEADPHONE_KEYWORDS.some(keyword => label.includes(keyword));
     });
 
     if (headphoneDevice && headphoneDevice.deviceId) {
       return headphoneDevice.deviceId;
     }
 
-    // 2. If multiple output devices exist and one is not 'default' and not built-in speaker
-    const nonDefaultDevice = outputs.find(d => {
-      const label = (d.label || '').toLowerCase();
-      const isSpeaker = label.includes('speaker') || label.includes('internal') || label.includes('phone');
-      return d.deviceId && d.deviceId !== 'default' && !isSpeaker;
-    });
-
-    if (nonDefaultDevice && nonDefaultDevice.deviceId) {
-      return nonDefaultDevice.deviceId;
-    }
-
-    // 3. Fallback to system default sink ("")
+    // Crucial: Fall back to system default sink ("").
+    // Operating systems (Android, iOS, Windows, macOS) automatically route system default 
+    // to active wired/Bluetooth headphones. Never pick a random non-default ID,
+    // which on mobile points to the external speakerphone!
     return '';
   } catch (err) {
     console.warn('[AudioRouting] Failed to query audio devices:', err);
